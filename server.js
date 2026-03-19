@@ -39,10 +39,14 @@ function scanCourses() {
             let color = 'from-blue-500 to-indigo-600';
             
             // 匹配 window.CourseData 中的元数据
-            const titleMatch = content.match(/title:\s*["'](.+?)["']/);
-            const iconMatch = content.match(/icon:\s*["'](.+?)["']/);
-            const descMatch = content.match(/desc:\s*["'](.+?)["']/);
-            const colorMatch = content.match(/color:\s*["'](.+?)["']/);
+            // 先定位 window.CourseData 位置，只从该位置之后提取，避免误匹配幻灯片内容中的同名字段
+            const courseDataIndex = content.indexOf('window.CourseData');
+            const metaContent = courseDataIndex >= 0 ? content.slice(courseDataIndex) : content;
+
+            const titleMatch = metaContent.match(/title:\s*["'](.+?)["']/);
+            const iconMatch = metaContent.match(/icon:\s*["'](.+?)["']/);
+            const descMatch = metaContent.match(/desc:\s*["'](.+?)["']/);
+            const colorMatch = metaContent.match(/color:\s*["'](.+?)["']/);
             
             if (titleMatch) title = titleMatch[1];
             if (iconMatch) icon = iconMatch[1];
