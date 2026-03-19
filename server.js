@@ -12,8 +12,86 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // ========================================================
+// 0. 课程状态管理
+// ========================================================
+
+// 扫描 courses 目录获取所有可用课程
+const coursesDir = path.join(__dirname, 'public', 'courses');
+
+function scanCourses() {
+    if (!fs.existsSync(coursesDir)) {
+        fs.mkdirSync(coursesDir, { recursive: true });
+        return [];
+    }
+    
+    const files = fs.readdirSync(coursesDir);
+    const courses = files
+        .filter(f => f.endsWith('.js'))
+        .map(f => {
+            const courseId = f.replace('.js', '');
+            const filePath = path.join(coursesDir, f);
+            const content = fs.readFileSync(filePath, 'utf-8');
+            
+            // 尝试从文件中提取课程元数据
+            let title = courseId;
+            let icon = '📚';
+            let desc = '';
+            let color = 'from-blue-500 to-indigo-600';
+            
+            // 匹配 window.CourseData 中的元数据
+            const titleMatch = content.match(/title:\s*["'](.+?)["']/);
+            const iconMatch = content.match(/icon:\s*["'](.+?)["']/);
+            const descMatch = content.match(/desc:\s*["'](.+?)["']/);
+            const colorMatch = content.match(/color:\s*["'](.+?)["']/);
+            
+            if (titleMatch) title = titleMatch[1];
+            if (iconMatch) icon = iconMatch[1];
+            if (descMatch) desc = descMatch[1];
+            if (colorMatch) color = colorMatch[1];
+            
+            return {
+                id: courseId,
+                file: f,
+                title,
+                icon,
+                desc,
+                color
+            };
+        });
+    
+    return courses;
+}
+
+// 当前选中的课程和课程状态
+let currentCourseId = null;
+let currentSlideIndex = 0;
+let courseCatalog = scanCourses();
+
+// ========================================================
 // 1. 静态文件托管 (如果在本地硬盘找到了，直接极速返回！)
 // ========================================================
+// 对 /lib/ 和 /weights/ 使用自定义处理，让不存在的文件进入缓存代理
+app.use('/lib', (req, res, next) => {
+    const filePath = path.join(__dirname, 'public', 'lib', req.path);
+    if (fs.existsSync(filePath)) {
+        // 文件存在，直接返回，添加缓存控制头防止浏览器缓存错误版本
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        return res.sendFile(filePath);
+    }
+    // 文件不存在，进入缓存代理
+    next();
+});
+
+app.use('/weights', (req, res, next) => {
+    const filePath = path.join(__dirname, 'public', 'weights', req.path);
+    if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ========================================================
@@ -57,15 +135,127 @@ const downloadAndCache = (url, dest, res) => {
     });
 };
 
-// 代理 1：拦截核心脚本库的请求
-app.use('/lib/face-api.min.js', (req, res) => {
-    // 欺骗前端引擎：当引擎发 HEAD 探测局域网通不通时，直接告诉它“我支持！”
-    if (req.method === 'HEAD') return res.status(200).end();
+// 代理 1：通用脚本代理 - 处理所有 /lib/ 下的脚本
+app.use('/lib/:fileName', (req, res) => {
+    const fileName = req.params.fileName;
+    const localPath = path.join(libDir, fileName);
     
-    console.log(`[缓存代理] 自动帮您从公网抓取缺失脚本: face-api.min.js`);
-    const remoteUrl = 'https://fastly.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-    const localPath = path.join(libDir, 'face-api.min.js');
-    downloadAndCache(remoteUrl, localPath, res);
+    // 特殊处理 face-api.js（使用固定版本）
+    if (fileName === 'face-api.min.js') {
+        // 欺骗前端引擎：当引擎发 HEAD 探测局域网通不通时，直接告诉它"我支持！"
+        if (req.method === 'HEAD') return res.status(200).end();
+        
+        console.log(`[缓存代理] 自动帮您从公网抓取缺失脚本: face-api.min.js`);
+        const remoteUrl = 'https://fastly.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+        return downloadAndCache(remoteUrl, localPath, res);
+    }
+    
+    // 其他脚本使用通用下载逻辑
+    // 尝试从 jsdelivr CDN 下载
+    // 支持的格式：库名@版本号/路径
+    // 例如：chart.min.js -> chart.js@latest/dist/chart.min.js
+    // 例如：chart.umd.min.js -> chart.js@latest/dist/chart.umd.min.js
+    
+    // 从文件名提取包名（去掉 .umd.min.js / .min.js / .js 后缀）
+    let packageName = fileName
+        .replace('.umd.min.js', '')
+        .replace('.min.js', '')
+        .replace('.js', '');
+    
+    // 包名映射（文件名 -> npm 包名）
+    const packageMap = {
+        'chart': 'chart.js'
+    };
+    packageName = packageMap[packageName] || packageName;
+    
+    // 尝试多个可能的 CDN 路径
+    const possibleUrls = [
+        // jsdelivr CDN
+        `https://cdn.jsdelivr.net/npm/${packageName}@latest/dist/${fileName}`,
+        `https://cdn.jsdelivr.net/npm/${packageName}@latest/${fileName}`,
+        // unpkg CDN
+        `https://unpkg.com/${packageName}@latest/dist/${fileName}`,
+        `https://unpkg.com/${packageName}@latest/${fileName}`
+    ];
+    
+    console.log(`[缓存代理] 下载 ${fileName}...`);
+    
+    // 尝试从指定 URL 下载
+    const tryDownloadFromUrl = (url, onSuccess, onError) => {
+        const client = url.startsWith('https') ? require('https') : require('http');
+        
+        client.get(url, (response) => {
+            // 处理重定向
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                let redirectUrl = response.headers.location;
+                // 如果是相对路径，转换为绝对路径
+                if (redirectUrl.startsWith('/')) {
+                    const urlObj = new URL(url);
+                    redirectUrl = `${urlObj.protocol}//${urlObj.host}${redirectUrl}`;
+                }
+                // 递归处理重定向
+                return tryDownloadFromUrl(redirectUrl, onSuccess, onError);
+            }
+            
+            if (response.statusCode === 200) {
+                onSuccess(response, url);
+            } else {
+                onError();
+            }
+        }).on('error', (err) => {
+            onError();
+        });
+    };
+    
+    // 尝试下载，使用第一个成功的
+    const tryNextUrl = (index) => {
+        if (index >= possibleUrls.length) {
+            console.log(`[缓存代理] ❌ 无法找到 ${fileName}`);
+            return res.status(404).send(`无法找到脚本: ${fileName}`);
+        }
+        
+        const url = possibleUrls[index];
+        
+        tryDownloadFromUrl(url, 
+            (response, finalUrl) => {
+                const size = response.headers['content-length'] || '未知';
+                console.log(`[缓存代理] ✅ ${fileName} 已下载 (${size} bytes)`);
+                
+                // 设置响应头
+                res.setHeader('Content-Type', response.headers['content-type'] || 'application/javascript');
+                res.setHeader('Cache-Control', 'public, max-age=31536000');
+                
+                // 创建文件写入流
+                const fileStream = fs.createWriteStream(localPath);
+                
+                // 同时写入文件和返回响应
+                response.on('data', (chunk) => {
+                    fileStream.write(chunk);
+                    res.write(chunk);
+                });
+                
+                response.on('end', () => {
+                    fileStream.end();
+                    res.end();
+                });
+                
+                response.on('error', (err) => {
+                    fileStream.destroy();
+                    console.error(`[缓存代理] 下载出错: ${err.message}`);
+                    if (fs.existsSync(localPath)) {
+                        fs.unlinkSync(localPath);
+                    }
+                    res.status(500).send('下载失败');
+                });
+            },
+            () => {
+                // 失败，尝试下一个 URL
+                tryNextUrl(index + 1);
+            }
+        );
+    };
+    
+    tryNextUrl(0);
 });
 
 // 代理 2：拦截所有的 AI 模型权重文件的请求
@@ -77,6 +267,33 @@ app.use('/weights/:fileName', (req, res) => {
     const remoteUrl = `https://fastly.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/${fileName}`;
     const localPath = path.join(weightsDir, fileName);
     downloadAndCache(remoteUrl, localPath, res);
+});
+
+// ========================================================
+// 🛠️ API 路由
+// ========================================================
+
+// 获取课程列表
+app.get('/api/courses', (req, res) => {
+    res.json({
+        courses: courseCatalog,
+        currentCourseId: currentCourseId,
+        currentSlideIndex: currentSlideIndex
+    });
+});
+
+// 获取当前课程状态
+app.get('/api/course-status', (req, res) => {
+    res.json({
+        currentCourseId: currentCourseId,
+        currentSlideIndex: currentSlideIndex
+    });
+});
+
+// 刷新课程列表（重新扫描目录）
+app.post('/api/refresh-courses', (req, res) => {
+    courseCatalog = scanCourses();
+    res.json({ success: true, courses: courseCatalog });
 });
 
 // ========================================================
@@ -104,8 +321,13 @@ io.on('connection', (socket) => {
     const role = isLocalhost ? 'host' : 'viewer';
     console.log(`🟢 用户连接: IP=${clientIp}, 自动分配: ${role === 'host' ? '🧑‍🏫 老师端' : '👨‍🎓 学生端'}`);
 
-    // 发送角色信息给当前客户端
-    socket.emit('role-assigned', { role: role });
+    // 发送角色信息和当前课程状态给当前客户端
+    socket.emit('role-assigned', { 
+        role: role,
+        currentCourseId: currentCourseId,
+        currentSlideIndex: currentSlideIndex,
+        courseCatalog: courseCatalog
+    });
 
     // 处理监控逻辑
     if (role === 'host') {
@@ -117,10 +339,54 @@ io.on('connection', (socket) => {
         io.to('hosts').emit('student-status', { count: studentCount, action: 'join', ip: clientIp });
     }
 
+    // 老师可以主动查询当前学生人数
+    socket.on('get-student-count', () => {
+        if (role === 'host') {
+            socket.emit('student-status', { count: studentCount, action: 'init' });
+        }
+    });
+
     // 翻页同步
     socket.on('sync-slide', (data) => {
         if (role === 'host') {
+            currentSlideIndex = data.slideIndex;
             socket.broadcast.emit('sync-slide', data);
+        }
+    });
+
+    // 课程切换（仅老师端可操作）
+    socket.on('select-course', (data) => {
+        if (role === 'host') {
+            const course = courseCatalog.find(c => c.id === data.courseId);
+            if (course) {
+                currentCourseId = data.courseId;
+                currentSlideIndex = 0;
+                console.log(`📚 老师切换课程: ${course.title} (${course.id})`);
+                // 广播给所有客户端切换课程
+                io.emit('course-changed', {
+                    courseId: currentCourseId,
+                    courseFile: course.file,
+                    slideIndex: 0
+                });
+            }
+        }
+    });
+
+    // 结束课程（返回课程选择界面）
+    socket.on('end-course', () => {
+        if (role === 'host') {
+            currentCourseId = null;
+            currentSlideIndex = 0;
+            console.log(`🏠 老师结束课程，返回课程选择界面`);
+            io.emit('course-ended');
+        }
+    });
+
+    // 刷新课程列表
+    socket.on('refresh-courses', () => {
+        if (role === 'host') {
+            courseCatalog = scanCourses();
+            socket.emit('course-catalog-updated', { courses: courseCatalog });
         }
     });
 

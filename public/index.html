@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>互动课堂 - 深度学习基础</title>
+    <title>互动课堂 - AI 教学系统</title>
 
     <!-- 1. 引入 Tailwind CSS (用于页面样式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -37,14 +37,8 @@
     <!-- React 会把所有的界面渲染到这个 div 里面 -->
     <div id="root"></div>
 
-    <!-- 6. 按顺序引入你刚才剥离出来的文件 -->
-    <!-- 必须加 type="text/babel"，告诉 Babel 这两个文件里有 React(JSX) 代码需要编译 -->
-    
-    <!-- 先引入引擎：它会把 window.SyncClassroom 准备好 -->
+    <!-- 6. 引入同步引擎：它负责课程选择、课堂同步和状态管理 -->
     <script type="text/babel" src="/SyncEngine.js"></script>
-    
-    <!-- 后引入内容：它会使用 window.SyncClassroom 并把它渲染到页面上 -->
-    <script type="text/babel" src="/CourseContent.js"></script>
 
 </body>
 </html>

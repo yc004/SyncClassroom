@@ -6,11 +6,11 @@
 
 ## **✨ 核心亮点**
 
-* 🎮 **教师全局控制台 (Course Dashboard)**：将多个课件集合在一个系统中。老师点击任意课件，无需刷新页面，全班学生屏幕瞬间热加载进入对应的课堂场景。老师也可一键结束课程，将全班拉回等待大厅。  
-* ⚙️ **JSX 热编译与动态装载 (Dynamic SPA)**：课件内容作为纯文本放置在目录下，底层通过 Babel Standalone 实时按需拉取、编译并注入运行。完全剥离外壳与内容，**永远告别 Webpack / Vite 构建烦恼**。  
-* 📡 **WebSocket 实时状态机**：不仅同步翻页，还支持**断线重连/迟到状态同步**。迟到的学生打开链接，会自动跳过大厅，直接跃迁到老师当前正在讲的 PPT 页面。  
-* 🤖 **无感鉴权与监控 (IP-based)**：通过 localhost 访问即为“主控端”；局域网 IP (192.168.x.x) 访问即为纯净的“观看端”。同时提供右上角实时人数与侧边栏上下线弹窗预警。  
-* ⚡️ **智能 CDN 缓存代理 (LAN Acceleration)**：内置 Node.js 爬虫层，解决 AI 权重模型下载卡顿痛点。主控端探路下载至硬盘，百位学生瞬间通过千兆局域网“秒传”取货，彻底打通局域网教学的最后一公里。
+* 🎮 **教师全局控制台**：多课件集合在一个系统，老师点击任意课件，全班学生屏幕瞬间热加载进入对应课堂。支持一键结束课程，将全班拉回等待大厅。
+* ⚙️ **JSX 热编译与动态装载**：课件作为纯文本放置在目录下，通过 Babel Standalone 实时按需拉取、编译并注入运行。**无需 Webpack / Vite 构建**。
+* 📡 **WebSocket 实时同步**：支持翻页同步、**断线重连/迟到状态同步**。迟到学生自动跳转到老师当前页面。
+* 🤖 **无感鉴权与监控**：`localhost` 访问为教师端；局域网 IP 访问为学生端。提供实时在线人数监控。
+* ⚡️ **智能 CDN 缓存代理**：内置脚本缓存代理，教师首次从公网下载第三方库（Chart.js、KaTeX 等）后，后续学生通过**千兆局域网秒传**，大幅提升加载速度。
 
 ## **📂 目录结构与配置**
 
@@ -23,48 +23,90 @@ SyncClassroom/
 └── public/                \<-- 静态资源总目录  
     ├── index.html         \<-- 入口基座 (不要改)  
     ├── SyncEngine.js      \<-- 底层路由、UI 与 Socket 引擎 (核心)  
-    └── courses/           \<-- 📁 新增！把所有的课件放在这里  
+    └── courses/           \<-- 📁 把所有的课件放在这里  
         ├── face-recognition.js  
-        └── fruit-sorting.js
+        └── intro-to-ai.js
 ```
 
-### **🔨 1\. 安装与启动**
+## **🚀 快速开始**
+
+### **1. 安装与启动**
 
 ```bash
-npm install express socket.io  
+npm install
 node server.js
 ```
 
-### **🔨 2\. 添加新课件**
+启动后：
+- 教师端：http://localhost:3000
+- 学生端：http://局域网IP:3000
 
-你想加几节课都可以！只需要两步：
+### **2. 使用流程**
 
-\*\*第一步：在 public/courses/ 下新建一个你的 xxx.js 课件文件。\*\*文件格式只需要定义各种 Slide 组件并在底部暴露出 window.CourseData 即可：
+1. **教师**访问 `localhost:3000`，在控制台选择课程并点击"开始授课"
+2. **学生**访问教师电脑的局域网 IP（如 `http://192.168.1.100:3000`）
+3. 教师翻页时，所有学生自动同步跟随
+4. 教师点击"结束课程"可返回选择界面
+
+### **3. 添加新课程**
+
+只需在 `public/courses/` 目录下创建 `.js` 文件即可：
 
 ```js
-function Slide1() { return \<h1\>我的第一页\</h1\>; }
+const { useState, useEffect, useRef } = React;
 
-window.CourseData \= {  
-    title: "AI 基础导论",  
-    slides: \[ { id: 's1', component: \<Slide1 /\> } \]  
+// 定义幻灯片组件
+function Slide1() {
+    return (
+        <div className="flex flex-col items-center justify-center min-h-full p-8">
+            <h1 className="text-4xl font-bold">课程标题</h1>
+            <p className="text-lg text-slate-600 mt-4">课程介绍</p>
+        </div>
+    );
+}
+
+// 课程数据
+window.CourseData = {
+    title: "课程标题",
+    icon: "📚",
+    desc: "简短描述",
+    color: "from-blue-500 to-indigo-600",
+    // 外部依赖（可选）
+    dependencies: [
+        // { name: "chartjs", localSrc: "/lib/chart.min.js", publicSrc: "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" }
+    ],
+    slides: [
+        { id: 's1', component: <Slide1 /> }
+    ]
 };
 ```
 
-**第二步：在 public/SyncEngine.js 顶部的清单中注册它：**
+保存文件后，刷新教师页面即可看到新课程！
+
+### **4. 外部依赖加载**
+
+课件可以声明外部脚本依赖（如 Chart.js、KaTeX）：
+
 ```js
-const COURSE\_CATALOG \= \[  
-    {  
-        id: 'ai-intro',                // 唯一ID  
-        file: 'ai-intro.js',           // 你在 courses/ 下建的文件名  
-        title: '人工智能基础导论',  
-        icon: '🤖',                    // 会展示在老师控制台卡片上  
-        desc: '一节非常生动的入门课',  
-        color: 'from-blue-500 to-indigo-600'  
-    }  
-\];
+dependencies: [
+    {
+        name: "chartjs",
+        localSrc: "/lib/chart.umd.min.js",
+        publicSrc: "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+    }
+]
 ```
 
-大功告成！老师现在就可以在控制台里看到这节新课，并带着全班一起体验了！
+**工作原理**：
+1. 首次加载时，服务器自动从公网下载脚本到 `public/lib/` 目录
+2. 后续访问直接从局域网加载，速度极快
+3. **注意**：`localSrc` 中的文件名需要与 CDN 上的实际文件名一致（如 `chart.umd.min.js`）
+
+## **📖 课程开发指南**
+
+详细的课程开发模板和 API 参考，请查看：
+- `course-template.md` - 课程模板说明
+- `create-course.skill` - 课程创建 Skill
 
 ## **📝 开源协议**
 
