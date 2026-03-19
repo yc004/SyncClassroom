@@ -4,19 +4,19 @@ title SyncClassroom 一键启动工具
 cls
 
 echo ==========================================
-echo   🚀 SyncClassroom 互动课堂启动工具
+echo   SyncClassroom 互动课堂启动工具
 echo ==========================================
 echo.
 
 :: 检查是否以管理员身份运行
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ⚠️  提示：建议右键选择"以管理员身份运行"以获得最佳体验
+    echo [提示] 建议右键选择"以管理员身份运行"以获得最佳体验
     echo.
     pause
     cls
     echo ==========================================
-    echo   🚀 SyncClassroom 互动课堂启动工具
+    echo   SyncClassroom 互动课堂启动工具
     echo ==========================================
     echo.
 )
@@ -24,44 +24,44 @@ if %errorLevel% neq 0 (
 :: 检查 Node.js
 where node >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ❌ 未检测到 Node.js 环境
+    echo [错误] 未检测到 Node.js 环境
     echo.
-    echo 📦 正在自动下载并安装 Node.js...
+    echo [信息] 正在自动下载并安装 Node.js...
     echo.
-    
+
     :: 下载 Node.js 安装包
     curl -L -o "%TEMP%\nodejs-installer.msi" "https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi"
-    
+
     if exist "%TEMP%\nodejs-installer.msi" (
-        echo 📥 下载完成，正在安装...
+        echo [信息] 下载完成，正在安装...
         start /wait msiexec /i "%TEMP%\nodejs-installer.msi" /qn /norestart
-        
+
         :: 刷新环境变量
         call refreshenv.cmd 2>nul || set "PATH=%PATH%;C:\Program Files\nodejs"
-        
+
         :: 验证安装
         where node >nul 2>&1
         if %errorLevel% neq 0 (
-            echo ❌ Node.js 安装失败，请手动安装
-            echo 🌐 下载地址：https://nodejs.org/
+            echo [错误] Node.js 安装失败，请手动安装
+            echo [信息] 下载地址：https://nodejs.org/
             pause
             exit /b 1
         )
-        
-        echo ✅ Node.js 安装成功！
+
+        echo [成功] Node.js 安装成功！
         del "%TEMP%\nodejs-installer.msi" 2>nul
     ) else (
-        echo ❌ 下载失败，请手动安装 Node.js
-        echo 🌐 下载地址：https://nodejs.org/
+        echo [错误] 下载失败，请手动安装 Node.js
+        echo [信息] 下载地址：https://nodejs.org/
         start https://nodejs.org/
         pause
         exit /b 1
     )
-    
+
     echo.
 ) else (
     for /f "tokens=*" %%a in ('node --version') do set NODE_VERSION=%%a
-    echo ✅ Node.js 已安装 (%NODE_VERSION%)
+    echo [成功] Node.js 已安装 (%NODE_VERSION%)
 )
 
 echo.
@@ -69,7 +69,7 @@ echo.
 :: 检查 npm
 where npm >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ❌ npm 未找到，请重新安装 Node.js
+    echo [错误] npm 未找到，请重新安装 Node.js
     pause
     exit /b 1
 )
@@ -79,31 +79,31 @@ cd /d "%~dp0"
 
 :: 检查 package.json
 if not exist "package.json" (
-    echo ❌ 未找到 package.json，请确保此脚本位于项目根目录
+    echo [错误] 未找到 package.json，请确保此脚本位于项目根目录
     pause
     exit /b 1
 )
 
 :: 检查 node_modules
 if not exist "node_modules" (
-    echo 📦 首次运行，正在安装依赖...
-    echo ⏳ 这可能需要几分钟时间，请耐心等待...
+    echo [信息] 首次运行，正在安装依赖...
+    echo [信息] 这可能需要几分钟时间，请耐心等待...
     echo.
     call npm install
-    
+
     if %errorLevel% neq 0 (
-        echo ❌ 依赖安装失败
+        echo [错误] 依赖安装失败
         pause
         exit /b 1
     )
-    
-    echo ✅ 依赖安装完成！
+
+    echo [成功] 依赖安装完成！
     echo.
 )
 
 :: 下载外部资源（用于断网环境）
 if exist "download-resources.js" (
-    echo 📦 检查外部资源...
+    echo [信息] 检查外部资源...
     node download-resources.js
     echo.
 )
@@ -121,19 +121,19 @@ if not defined LOCAL_IP (
 
 cls
 echo ==========================================
-echo   🚀 SyncClassroom 互动课堂启动工具
+echo   SyncClassroom 互动课堂启动工具
 echo ==========================================
 echo.
-echo ✅ 环境检查完成！
+echo [成功] 环境检查完成！
 echo.
-echo 📋 启动信息：
-echo    • 教师端：http://localhost:3000
-echo    • 学生端：http://%LOCAL_IP%:3000
+echo 启动信息：
+echo   教师端：http://localhost:3000
+echo   学生端：http://%LOCAL_IP%:3000
 echo.
-echo 💡 提示：
-echo    • 教师请在浏览器中打开 http://localhost:3000
-echo    • 学生请在浏览器中打开 http://%LOCAL_IP%:3000
-echo    • 按 Ctrl+C 可以停止服务
+echo 提示：
+echo   - 教师请在浏览器中打开 http://localhost:3000
+echo   - 学生请在浏览器中打开 http://%LOCAL_IP%:3000
+echo   - 按 Ctrl+C 可以停止服务
 echo.
 echo ==========================================
 echo.
@@ -143,5 +143,5 @@ node server.js
 
 :: 如果服务器异常退出
 echo.
-echo ❌ 服务器已停止
+echo [信息] 服务器已停止
 pause
