@@ -716,7 +716,7 @@ function ApplicationsSlide() {
 // ========================================================
 function SummarySlide() {
     const keyPoints = [
-        { icon: "fa-brain", text: "感知机是一种简单的"决策机器"，接收输入，输出是或否" },
+        { icon: "fa-brain", text: "感知机是一种简单的\"决策机器\"，接收输入，输出是或否" },
         { icon: "fa-balance-scale", text: "权重决定每个输入的重要程度，阈值决定触发条件" },
         { icon: "fa-calculator", text: "计算公式：加权和 ≥ 阈值 → 输出1，否则输出0" },
         { icon: "fa-rocket", text: "感知机是现代AI的基础，深度学习由大量感知机组成" },

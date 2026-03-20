@@ -522,6 +522,13 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 教师端推送设置变更给所有学生
+    socket.on('host-settings', (settings) => {
+        if (role === 'host') {
+            socket.broadcast.emit('host-settings', settings);
+        }
+    });
+
     // 刷新课程列表
     socket.on('refresh-courses', () => {
         if (role === 'host') {

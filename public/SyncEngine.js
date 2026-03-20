@@ -158,16 +158,30 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
     const [studentCount, setStudentCount] = useState(0);
     const [toasts, setToasts] = useState([]);
     
+    // 教师设置
+    const [settings, setSettings] = useState({
+        forceFullscreen: true,
+        syncFollow: true,
+        alertJoin: true,
+        alertLeave: true,
+        alertFullscreenExit: true,
+        alertTabHidden: true,
+    });
+    const [showSettings, setShowSettings] = useState(false);
+    
     const socketRef = useRef(socket);
     const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(!initialIsHost);
 
     // 学生端：自动全屏逻辑
+    const settingsRef = useRef(settings);
+    useEffect(() => { settingsRef.current = settings; }, [settings]);
+
     useEffect(() => {
         if (isHost) return;
 
         const onFullscreenChange = () => {
             if (!document.fullscreenElement) {
-                setShowFullscreenPrompt(true);
+                if (settingsRef.current.forceFullscreen) setShowFullscreenPrompt(true);
                 socketRef.current && socketRef.current.emit('student-alert', { type: 'fullscreen-exit' });
             }
         };
@@ -202,15 +216,16 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
 
         // 监听翻页同步指令
         socket.on('sync-slide', (data) => {
+            if (!isHost && !settingsRef.current.syncFollow) return;
             setCurrentSlide(data.slideIndex);
         });
 
         // 监听学生上下线状态 (只有后端判断是 host 才会发过来)
         socket.on('student-status', (data) => {
             setStudentCount(data.count);
-            if (data.action === 'join') {
+            if (data.action === 'join' && settingsRef.current.alertJoin) {
                 showToast(`👋 学生上线 (IP: ${data.ip})`, 'success');
-            } else if (data.action === 'leave') {
+            } else if (data.action === 'leave' && settingsRef.current.alertLeave) {
                 showToast(`🏃 学生离开 (IP: ${data.ip})`, 'warning');
             }
         });
@@ -218,10 +233,18 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
         // 监听学生异常行为
         socket.on('student-alert', (data) => {
             const ip = data.ip;
-            if (data.type === 'fullscreen-exit') {
+            if (data.type === 'fullscreen-exit' && settingsRef.current.alertFullscreenExit) {
                 showToast(`⚠️ 学生退出全屏 (IP: ${ip})`, 'warning');
-            } else if (data.type === 'tab-hidden') {
+            } else if (data.type === 'tab-hidden' && settingsRef.current.alertTabHidden) {
                 showToast(`👁️ 学生切换页面 (IP: ${ip})`, 'warning');
+            }
+        });
+
+        // 学生端监听教师设置变更
+        socket.on('host-settings', (s) => {
+            setSettings(s);
+            if (!isHost && s.forceFullscreen && !document.fullscreenElement) {
+                setShowFullscreenPrompt(true);
             }
         });
 
@@ -234,6 +257,7 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
             socket.off('sync-slide');
             socket.off('student-status');
             socket.off('student-alert');
+            socket.off('host-settings');
         };
     }, [socket, isHost]);
 
@@ -250,6 +274,13 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
 
     const nextSlide = () => goToSlide(currentSlide + 1);
     const prevSlide = () => goToSlide(currentSlide - 1);
+
+    // 教师端：更新设置并广播给学生
+    const updateSetting = (key, value) => {
+        const next = { ...settingsRef.current, [key]: value };
+        setSettings(next);
+        socketRef.current && socketRef.current.emit('host-settings', next);
+    };
 
     // ========================================================
     // 界面渲染
@@ -271,7 +302,7 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
         <div className="flex flex-col h-screen bg-slate-900 text-slate-800 font-sans overflow-hidden select-none">
             
             {/* 学生端全屏提示遮罩 */}
-            {!isHost && showFullscreenPrompt && (
+            {!isHost && showFullscreenPrompt && settings.forceFullscreen && (
                 <div
                     className="fixed inset-0 z-[9999] bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer"
                     onClick={() => {
@@ -322,6 +353,17 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
                         >
                             <i className="fas fa-stop mr-2"></i>
                             <span className="hidden md:inline">结束课程</span>
+                        </button>
+                    )}
+                    
+                    {/* 设置按钮（仅教师端） */}
+                    {isHost && (
+                        <button
+                            onClick={() => setShowSettings(v => !v)}
+                            className="flex items-center px-3 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm font-bold"
+                            title="课堂设置"
+                        >
+                            <i className="fas fa-gear"></i>
                         </button>
                     )}
                     
@@ -414,6 +456,48 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
                 )}
             </div>
             
+            {/* 设置面板（仅教师端） */}
+            {isHost && showSettings && (
+                <div className="fixed inset-0 z-[9998] flex justify-end" onClick={() => setShowSettings(false)}>
+                    <div
+                        className="w-80 h-full bg-white shadow-2xl border-l border-slate-200 flex flex-col overflow-y-auto"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                            <h3 className="font-bold text-slate-800 text-lg flex items-center">
+                                <i className="fas fa-gear mr-2 text-blue-500"></i> 课堂设置
+                            </h3>
+                            <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600">
+                                <i className="fas fa-xmark text-xl"></i>
+                            </button>
+                        </div>
+                        <div className="flex-1 px-6 py-4 space-y-5">
+                            {[
+                                { key: 'forceFullscreen',     label: '强制学生全屏',     icon: 'fa-expand' },
+                                { key: 'syncFollow',          label: '学生跟随翻页',     icon: 'fa-rotate' },
+                                { key: 'alertJoin',           label: '学生上线提醒',     icon: 'fa-user-plus' },
+                                { key: 'alertLeave',          label: '学生离线提醒',     icon: 'fa-user-minus' },
+                                { key: 'alertFullscreenExit', label: '退出全屏提醒',     icon: 'fa-compress' },
+                                { key: 'alertTabHidden',      label: '切换页面提醒',     icon: 'fa-eye-slash' },
+                            ].map(({ key, label, icon }) => (
+                                <div key={key} className="flex items-center justify-between">
+                                    <span className="flex items-center text-slate-700 font-medium text-sm">
+                                        <i className={`fas ${icon} w-5 mr-2 text-slate-400`}></i>
+                                        {label}
+                                    </span>
+                                    <button
+                                        onClick={() => updateSetting(key, !settings[key])}
+                                        className={`relative w-12 h-6 rounded-full transition-colors ${settings[key] ? 'bg-blue-500' : 'bg-slate-300'}`}
+                                    >
+                                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${settings[key] ? 'left-7' : 'left-1'}`}></span>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* 侧边通知弹窗容器 (Toast) */}
             <div className="fixed top-24 right-6 z-50 flex flex-col space-y-3 pointer-events-none">
                 {toasts.map(t => (
