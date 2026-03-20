@@ -15,28 +15,7 @@
 !macro customUnInstall
     ; Write a VBScript that shows a password InputBox and saves result to temp file
     FileOpen $R8 "$TEMP\sc_getpwd.vbs" w
-    FileWrite $R8 "Dim pwd"
-    FileWriteByte $R8 "13"
-    FileWriteByte $R8 "10"
-    FileWrite $R8 "pwd = InputBox(""Enter admin password to uninstall SyncClassroom Student:"", ""SyncClassroom Student"")"
-    FileWriteByte $R8 "13"
-    FileWriteByte $R8 "10"
-    FileWrite $R8 "If pwd = """" Then WScript.Quit 1"
-    FileWriteByte $R8 "13"
-    FileWriteByte $R8 "10"
-    FileWrite $R8 "Set fso = CreateObject(""Scripting.FileSystemObject"")"
-    FileWriteByte $R8 "13"
-    FileWriteByte $R8 "10"
-    FileWrite $R8 "Set f = fso.OpenTextFile(""$TEMP\sc_pwd.tmp"", 2, True)"
-    FileWriteByte $R8 "13"
-    FileWriteByte $R8 "10"
-    FileWrite $R8 "f.Write pwd"
-    FileWriteByte $R8 "13"
-    FileWriteByte $R8 "10"
-    FileWrite $R8 "f.Close"
-    FileWriteByte $R8 "13"
-    FileWriteByte $R8 "10"
-    FileWrite $R8 "WScript.Quit 0"
+    FileWrite $R8 'Dim pwd$\r$\npwd = InputBox("Enter admin password to uninstall SyncClassroom Student:", "SyncClassroom Student")$\r$\nIf pwd = "" Then WScript.Quit 1$\r$\nSet fso = CreateObject("Scripting.FileSystemObject")$\r$\nSet f = fso.OpenTextFile("$TEMP\sc_pwd.tmp", 2, True)$\r$\nf.Write pwd$\r$\nf.Close$\r$\nWScript.Quit 0'
     FileClose $R8
 
     ExecWait 'wscript.exe //NoLogo "$TEMP\sc_getpwd.vbs"' $R7

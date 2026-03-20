@@ -32,6 +32,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Update version from tag
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          $json = Get-Content package.json -Raw | ConvertFrom-Json
+          $json.version = $version
+          $json | ConvertTo-Json -Depth 100 | Set-Content package.json -Encoding UTF8
+
       - name: Generate icons
         run: python build/convert-icons.py
         env:
