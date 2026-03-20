@@ -24,12 +24,12 @@ function CourseSelector({ courses, currentCourseId, onSelectCourse, onRefresh, s
     return (
         <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
             {/* 顶栏 */}
-            <div className="flex items-center justify-between px-8 py-5 bg-slate-800 border-b border-slate-700">
+            <div className="flex items-center justify-between px-8 py-5 bg-slate-800 border-b border-slate-700" style={{WebkitAppRegion:'drag'}}>
                 <div className="flex items-center space-x-3">
                     <i className="fas fa-chalkboard-teacher text-blue-400 text-2xl"></i>
                     <h1 className="text-2xl font-bold">教师控制台</h1>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3" style={{WebkitAppRegion:'no-drag'}}>
                     <span className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full text-sm font-bold border border-blue-500/30">
                         🧑‍🏫 老师端 (主控)
                     </span>
@@ -312,7 +312,7 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
         <div className="flex flex-col h-screen bg-slate-900 text-slate-800 font-sans overflow-hidden select-none">
             
             {/* 顶栏 (Header) */}
-            <div className="flex items-center justify-between px-6 md:px-8 py-4 bg-white shadow-md z-20 relative h-[72px] shrink-0">
+            <div className="flex items-center justify-between px-6 md:px-8 py-4 bg-white shadow-md z-20 relative h-[72px] shrink-0" style={{WebkitAppRegion:'drag'}}>
                 <div className="flex items-center space-x-3">
                     <i className="fas fa-microchip text-blue-600 text-2xl md:text-3xl"></i>
                     <h1 className="text-lg md:text-2xl font-bold text-slate-800 tracking-wide truncate max-w-[200px] md:max-w-none">{title}</h1>
@@ -338,7 +338,7 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
                     </div>
                 </div>
 
-                <div className="flex items-center space-x-3 md:space-x-4">
+                <div className="flex items-center space-x-3 md:space-x-4" style={{WebkitAppRegion:'no-drag'}}>
                     {/* 结束课程按钮（仅教师端） */}
                     {isHost && onEndCourse && (
                         <button
