@@ -2,14 +2,18 @@
 // 教师端主进程
 // 职责：启动 server.js，打开教师端浏览器窗口
 // ========================================================
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain } = require('electron');
 const path = require('path');
 const { fork, spawnSync } = require('child_process');
+const { loadSettings, saveSettings } = require('./config.js');
 
 // 切换 Windows 控制台代码页为 UTF-8，解决中文乱码
 if (process.platform === 'win32') {
     spawnSync('chcp', ['65001'], { shell: true, stdio: 'ignore' });
 }
+
+// 禁用 GPU 磁盘缓存，避免 Windows 上因缓存目录锁定导致的启动报错
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 
 let mainWindow = null;
 let tray = null;
@@ -82,6 +86,41 @@ app.whenReady().then(() => {
     startServer();
     createWindow();
     createTray();
+});
+
+// IPC: 读取/保存教师端设置
+ipcMain.handle('get-settings', () => loadSettings());
+ipcMain.handle('save-settings', (_, settings) => saveSettings(settings));
+
+// IPC: 导入课程文件（弹出文件选择对话框，复制到 public/courses/）
+ipcMain.handle('import-course', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: '导入课程文件',
+        filters: [{ name: '课程文件', extensions: ['tsx', 'js'] }],
+        properties: ['openFile', 'multiSelections'],
+    });
+    if (result.canceled || !result.filePaths.length) {
+        return { success: false, canceled: true };
+    }
+    const coursesDir = path.join(__dirname, '..', 'public', 'courses');
+    if (!require('fs').existsSync(coursesDir)) {
+        require('fs').mkdirSync(coursesDir, { recursive: true });
+    }
+    const imported = [];
+    const skipped = [];
+    for (const srcPath of result.filePaths) {
+        const fileName = path.basename(srcPath);
+        const destPath = path.join(coursesDir, fileName);
+        try {
+            require('fs').copyFileSync(srcPath, destPath);
+            imported.push(fileName);
+            console.log(`[import] course imported: ${fileName}`);
+        } catch (err) {
+            skipped.push(fileName);
+            console.error(`[import] failed to copy ${fileName}: ${err.message}`);
+        }
+    }
+    return { success: true, imported, skipped };
 });
 
 app.on('window-all-closed', (e) => {

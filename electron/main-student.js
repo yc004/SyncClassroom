@@ -16,11 +16,33 @@ if (process.platform === 'win32') {
     spawnSync('chcp', ['65001'], { shell: true, stdio: 'ignore' });
 }
 
+// ── 安装后服务注册（NSIS customInstall 调用）────────────
+if (process.argv.includes('--register-service')) {
+    // 以 sc.exe 注册自启动服务，指向当前 exe
+    const exePath = process.execPath;
+    spawnSync('sc', [
+        'create', 'SyncClassroomStudent',
+        'binPath=', `"${exePath}"`,
+        'start=', 'auto',
+        'DisplayName=', 'SyncClassroom Student Guard',
+    ], { shell: false, stdio: 'ignore' });
+    spawnSync('sc', ['description', 'SyncClassroomStudent', 'SyncClassroom 学生端守护服务'], { shell: false, stdio: 'ignore' });
+    spawnSync('sc', ['start', 'SyncClassroomStudent'], { shell: false, stdio: 'ignore' });
+    process.exit(0);
+}
+
+// 禁用 GPU 磁盘缓存，避免 Windows 上因缓存目录锁定导致的启动报错
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-http-cache');
+
 let mainWindow = null;
 let adminWindow = null;
 let tray = null;
 let isClassActive = false;
+let forceFullscreen = true; // 跟踪教师端的强制全屏设置
 let config = loadConfig();
+let retryTimer = null; // 后台重连定时器
+const RETRY_INTERVAL_MS = 5000; // 每 5 秒重试一次
 
 // ── 开机自启 ─────────────────────────────────────────────
 app.setLoginItemSettings({
@@ -28,6 +50,34 @@ app.setLoginItemSettings({
     openAsHidden: false,
     name: 'SyncClassroom 学生端',
 });
+
+// ── 后台轮询重连 ─────────────────────────────────────────
+function startRetrying() {
+    if (retryTimer) return; // 已在重试中
+    retryTimer = setInterval(() => {
+        const url = `http://${config.teacherIp}:${config.port || 3000}`;
+        const http = require('http');
+        http.get(url, (res) => {
+            res.resume(); // 消费响应体
+            if (res.statusCode < 500) {
+                // 服务器已就绪，停止重试并加载页面
+                stopRetrying();
+                if (mainWindow) {
+                    mainWindow.loadURL(url).catch(() => {});
+                }
+            }
+        }).on('error', () => {
+            // 仍然无法连接，继续等待
+        });
+    }, RETRY_INTERVAL_MS);
+}
+
+function stopRetrying() {
+    if (retryTimer) {
+        clearInterval(retryTimer);
+        retryTimer = null;
+    }
+}
 
 // ── 创建主窗口（学生课堂窗口）────────────────────────────
 function createMainWindow() {
@@ -43,24 +93,54 @@ function createMainWindow() {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
         },
-        show: true,
+        show: false, // 静默启动，课堂开始后才显示
     });
     mainWindow.setMenu(null);
 
     mainWindow.loadURL(url).catch(() => {
-        // 连接失败时显示离线提示页
+        // 连接失败时显示离线提示页，并开始后台重连
         mainWindow.loadFile(path.join(__dirname, 'offline.html'));
+        startRetrying();
+    });
+
+    // 页面成功加载时停止重试
+    mainWindow.webContents.on('did-navigate', (_, navUrl) => {
+        if (!navUrl.startsWith('file://')) {
+            stopRetrying();
+        }
     });
 
     // 阻止关闭：课堂进行中完全阻止，平时最小化到托盘
     mainWindow.on('close', (e) => {
         e.preventDefault();
         if (isClassActive) {
-            // 课堂中：不允许任何关闭操作
             return;
         }
-        // 非课堂中：最小化到托盘
         mainWindow.hide();
+    });
+
+    // Win+D / 系统最小化：课堂模式下立即恢复
+    mainWindow.on('minimize', () => {
+        if (isClassActive && forceFullscreen) {
+            setImmediate(() => {
+                mainWindow.restore();
+                mainWindow.setFullScreen(true);
+                mainWindow.setAlwaysOnTop(true, 'screen-saver');
+                mainWindow.focus();
+            });
+        }
+    });
+
+    // 失焦时（切换到其他窗口）：课堂模式下抢回焦点
+    mainWindow.on('blur', () => {
+        if (isClassActive && forceFullscreen) {
+            // 短暂延迟，避免与管理员窗口冲突
+            setTimeout(() => {
+                if (!adminWindow || !adminWindow.isFocused()) {
+                    mainWindow && mainWindow.focus();
+                }
+            }, 200);
+        }
     });
 
     // 阻止 Alt+F4 / 系统关闭
@@ -68,18 +148,32 @@ function createMainWindow() {
         if (input.alt && input.key === 'F4') {
             event.preventDefault();
         }
+        // 阻止 Win 键组合（部分系统快捷键）
+        if (input.meta) {
+            event.preventDefault();
+        }
     });
 }
 
-// ── 课堂开始：全屏置顶 ───────────────────────────────────
+// ── 课堂开始：按设置决定是否全屏置顶 ───────────────────
 function enterClassMode() {
     isClassActive = true;
     if (!mainWindow) return;
     mainWindow.show();
-    mainWindow.setAlwaysOnTop(true, 'screen-saver'); // 最高层级
-    mainWindow.setFullScreen(true);
     mainWindow.setSkipTaskbar(false);
     mainWindow.focus();
+    if (forceFullscreen) {
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        mainWindow.setFullScreen(true);
+        // 延迟再次强制，防止系统动画完成后被抢走
+        setTimeout(() => {
+            if (isClassActive && forceFullscreen && mainWindow) {
+                mainWindow.setFullScreen(true);
+                mainWindow.setAlwaysOnTop(true, 'screen-saver');
+                mainWindow.focus();
+            }
+        }, 500);
+    }
 }
 
 // ── 课堂结束：恢复普通窗口 ──────────────────────────────
@@ -135,11 +229,18 @@ function createTray() {
 }
 
 // ── IPC 处理 ─────────────────────────────────────────────
-ipcMain.on('class-started', () => enterClassMode());
+ipcMain.on('class-started', (_, opts) => {
+    // opts 可携带 { forceFullscreen } 覆盖当前标志
+    if (opts && typeof opts.forceFullscreen === 'boolean') {
+        forceFullscreen = opts.forceFullscreen;
+    }
+    enterClassMode();
+});
 ipcMain.on('class-ended', () => exitClassMode());
 
 // 教师端远程控制全屏开关（课堂进行中有效）
 ipcMain.on('set-fullscreen', (_, enable) => {
+    forceFullscreen = enable; // 始终更新标志，供 enterClassMode 使用
     if (!mainWindow || !isClassActive) return;
     if (enable) {
         mainWindow.setFullScreen(true);
@@ -161,10 +262,12 @@ ipcMain.handle('save-config', (_, newConfig) => {
     config = { ...config, ...newConfig };
     const ok = saveConfig(config);
     if (ok && mainWindow) {
+        stopRetrying();
         // 重新加载新 IP
         const url = `http://${config.teacherIp}:${config.port || 3000}`;
         mainWindow.loadURL(url).catch(() => {
             mainWindow.loadFile(path.join(__dirname, 'offline.html'));
+            startRetrying();
         });
     }
     return ok;
@@ -178,6 +281,29 @@ ipcMain.handle('verify-password', (_, pwd) => {
 });
 
 ipcMain.handle('get-role', () => 'student');
+
+// 学生端不需要课堂设置（教师端专用），返回 null 避免 IPC 报错
+ipcMain.handle('get-settings', () => null);
+ipcMain.handle('save-settings', () => null);
+
+// 教师端远程推送新管理员密码 hash
+ipcMain.on('set-admin-password', (_, hash) => {
+    config = { ...config, adminPasswordHash: hash };
+    saveConfig(config);
+    console.log('[admin] password updated remotely');
+});
+
+// 手动重试（offline.html 按钮触发）
+ipcMain.on('manual-retry', () => {
+    stopRetrying();
+    const url = `http://${config.teacherIp}:${config.port || 3000}`;
+    if (mainWindow) {
+        mainWindow.loadURL(url).catch(() => {
+            mainWindow.loadFile(path.join(__dirname, 'offline.html'));
+            startRetrying();
+        });
+    }
+});
 
 // ── 应用生命周期 ─────────────────────────────────────────
 app.whenReady().then(() => {

@@ -417,6 +417,12 @@ app.post('/api/refresh-courses', (req, res) => {
     res.json({ success: true, courses: courseCatalog });
 });
 
+// 获取当前在线学生列表
+app.get('/api/students', (req, res) => {
+    const students = Array.from(studentIPs.keys()).map(ip => ip.startsWith('::ffff:') ? ip.slice(7) : ip);
+    res.json({ students });
+});
+
 // 获取学生操作日志
 app.get('/api/student-log', (req, res) => {
     res.json({ log: studentLog });
@@ -461,6 +467,16 @@ app.get('*', (req, res) => {
 
 let studentIPs = new Map(); // IP -> socket数量，同一IP只计一个学生
 
+// 教师端当前设置（服务端缓存，用于新连接学生同步）
+let currentHostSettings = {
+    forceFullscreen: true,
+    syncFollow: true,
+    alertJoin: true,
+    alertLeave: true,
+    alertFullscreenExit: true,
+    alertTabHidden: true,
+};
+
 // 学生操作日志（内存，最多保留 500 条）
 const studentLog = [];
 const LOG_MAX = 500;
@@ -474,8 +490,10 @@ function pushLog(type, ip, extra) {
 }
 
 io.on('connection', (socket) => {
-    const clientIp = socket.handshake.address;
-    const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+    // 统一转换为 IPv4，去掉 IPv6 映射前缀 ::ffff:
+    const rawIp = socket.handshake.address;
+    const clientIp = rawIp.startsWith('::ffff:') ? rawIp.slice(7) : rawIp;
+    const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1';
     
     const role = isLocalhost ? 'host' : 'viewer';
     console.log(`[conn] IP=${clientIp} role=${role}`);
@@ -485,7 +503,8 @@ io.on('connection', (socket) => {
         role: role,
         currentCourseId: currentCourseId,
         currentSlideIndex: currentSlideIndex,
-        courseCatalog: courseCatalog
+        courseCatalog: courseCatalog,
+        hostSettings: currentHostSettings,
     });
 
     // 处理监控逻辑
@@ -529,7 +548,8 @@ io.on('connection', (socket) => {
                 io.emit('course-changed', {
                     courseId: currentCourseId,
                     courseFile: course.file,
-                    slideIndex: 0
+                    slideIndex: 0,
+                    hostSettings: currentHostSettings,
                 });
             }
         }
@@ -568,7 +588,16 @@ io.on('connection', (socket) => {
     // 教师端推送设置变更给所有学生
     socket.on('host-settings', (settings) => {
         if (role === 'host') {
+            currentHostSettings = { ...currentHostSettings, ...settings };
             socket.broadcast.emit('host-settings', settings);
+        }
+    });
+
+    // 教师端推送新管理员密码给所有学生
+    socket.on('set-admin-password', (data) => {
+        if (role === 'host' && data && data.hash) {
+            console.log('[admin] password update pushed to students');
+            socket.broadcast.emit('set-admin-password', { hash: data.hash });
         }
     });
 
