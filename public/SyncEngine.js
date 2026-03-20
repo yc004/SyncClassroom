@@ -147,8 +147,8 @@ function StudentWaitingRoom({ message }) {
     );
 }
 
-function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHost }) {
-    const [currentSlide, setCurrentSlide] = useState(0);
+function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHost, initialSlide }) {
+    const [currentSlide, setCurrentSlide] = useState(initialSlide || 0);
     
     // 角色与状态控制
     const [isHost, setIsHost] = useState(initialIsHost || false);
@@ -470,7 +470,9 @@ function ClassroomApp() {
     const [courseCatalog, setCourseCatalog] = useState([]);
     const [currentCourseId, setCurrentCourseId] = useState(null);
     const [currentCourseData, setCurrentCourseData] = useState(null);
+    const [initialSlideIndex, setInitialSlideIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
+    const [courseError, setCourseError] = useState(null);
     const socketRef = useRef(null);
     const courseCatalogRef = useRef([]); // 用于解决闭包问题
 
@@ -489,6 +491,7 @@ function ClassroomApp() {
             
             // 如果已经有选中的课程，加载它
             if (data.currentCourseId) {
+                setInitialSlideIndex(data.currentSlideIndex || 0);
                 loadCourse(data.currentCourseId, catalog);
             }
         });
@@ -496,6 +499,7 @@ function ClassroomApp() {
         // 监听课程切换
         socketRef.current.on('course-changed', (data) => {
             setCurrentCourseId(data.courseId);
+            setInitialSlideIndex(data.slideIndex || 0);
             loadCourse(data.courseId, courseCatalogRef.current);
         });
 
@@ -527,6 +531,7 @@ function ClassroomApp() {
         }
 
         setIsLoading(true);
+        setCourseError(null);
         
         try {
             // 动态加载课程脚本
@@ -608,6 +613,7 @@ function ClassroomApp() {
             }
         } catch (err) {
             console.error('[ClassroomApp] 加载课程失败:', err);
+            setCourseError(err);
         } finally {
             setIsLoading(false);
         }
@@ -657,7 +663,50 @@ function ClassroomApp() {
     }
 
     // 加载中
-    if (isLoading || !currentCourseData) {
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none">
+                <i className="fas fa-layer-group fa-bounce text-5xl text-purple-500 mb-6"></i>
+                <h2 className="text-2xl tracking-widest font-bold">正在加载课程内容...</h2>
+                <p className="text-slate-400 mt-3 text-sm flex items-center">
+                    <i className="fas fa-bolt text-yellow-400 mr-2"></i> 请稍候
+                </p>
+            </div>
+        );
+    }
+
+    // 加载失败（仅教师端显示错误详情）
+    if (courseError && !currentCourseData) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none p-8">
+                <i className="fas fa-circle-exclamation text-5xl text-red-400 mb-6"></i>
+                <h2 className="text-2xl font-bold mb-2">课程加载失败</h2>
+                {isHost ? (
+                    <div className="mt-4 w-full max-w-2xl">
+                        <div className="bg-red-950/60 border border-red-500/40 rounded-2xl p-6 text-left">
+                            <p className="text-red-300 font-bold mb-2 flex items-center">
+                                <i className="fas fa-bug mr-2"></i> 错误详情
+                            </p>
+                            <pre className="text-red-200 text-sm font-mono whitespace-pre-wrap break-all leading-relaxed">
+                                {courseError.message || String(courseError)}
+                            </pre>
+                        </div>
+                        <button
+                            onClick={() => { setCourseError(null); setCurrentCourseId(null); }}
+                            className="mt-6 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold transition-colors"
+                        >
+                            <i className="fas fa-arrow-left mr-2"></i> 返回课程选择
+                        </button>
+                    </div>
+                ) : (
+                    <p className="text-slate-400 mt-2">请等待老师重新加载课程</p>
+                )}
+            </div>
+        );
+    }
+
+    // 无课程数据（兜底）
+    if (!currentCourseData) {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none">
                 <i className="fas fa-layer-group fa-bounce text-5xl text-purple-500 mb-6"></i>
@@ -677,6 +726,7 @@ function ClassroomApp() {
             onEndCourse={isHost ? handleEndCourse : null}
             socket={socketRef.current}
             isHost={isHost}
+            initialSlide={initialSlideIndex}
         />
     );
 }
