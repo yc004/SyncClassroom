@@ -135,6 +135,18 @@ function createTray() {
 ipcMain.on('class-started', () => enterClassMode());
 ipcMain.on('class-ended', () => exitClassMode());
 
+// 教师端远程控制全屏开关（课堂进行中有效）
+ipcMain.on('set-fullscreen', (_, enable) => {
+    if (!mainWindow || !isClassActive) return;
+    if (enable) {
+        mainWindow.setFullScreen(true);
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    } else {
+        mainWindow.setFullScreen(false);
+        mainWindow.setAlwaysOnTop(false);
+    }
+});
+
 ipcMain.handle('get-config', () => ({ ...config, adminPasswordHash: undefined }));
 
 ipcMain.handle('save-config', (_, newConfig) => {

@@ -172,9 +172,8 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
     const [showSettings, setShowSettings] = useState(false);
     
     const socketRef = useRef(socket);
-    const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(!initialIsHost);
 
-    // 学生端：自动全屏逻辑
+    // 学生端：监控行为上报（全屏退出、切换标签）
     const settingsRef = useRef(settings);
     useEffect(() => { settingsRef.current = settings; }, [settings]);
 
@@ -183,7 +182,7 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
 
         const onFullscreenChange = () => {
             if (!document.fullscreenElement) {
-                if (settingsRef.current.forceFullscreen) setShowFullscreenPrompt(true);
+                // 仅上报日志，全屏控制由 Electron 主进程负责
                 socketRef.current && socketRef.current.emit('student-alert', { type: 'fullscreen-exit' });
             }
         };
@@ -245,8 +244,9 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
         // 学生端监听教师设置变更
         socket.on('host-settings', (s) => {
             setSettings(s);
-            if (!isHost && s.forceFullscreen && !document.fullscreenElement) {
-                setShowFullscreenPrompt(true);
+            // forceFullscreen 变更时通过 Electron IPC 控制窗口全屏
+            if (!isHost) {
+                window.electronAPI?.setFullscreen(s.forceFullscreen);
             }
         });
 
@@ -310,21 +310,6 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
     // 分配好角色后，显示主界面
     return (
         <div className="flex flex-col h-screen bg-slate-900 text-slate-800 font-sans overflow-hidden select-none">
-            
-            {/* 学生端全屏提示遮罩 */}
-            {!isHost && showFullscreenPrompt && settings.forceFullscreen && (
-                <div
-                    className="fixed inset-0 z-[9999] bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer"
-                    onClick={() => {
-                        document.documentElement.requestFullscreen().catch(() => {});
-                        setShowFullscreenPrompt(false);
-                    }}
-                >
-                    <i className="fas fa-expand text-6xl text-blue-400 mb-6"></i>
-                    <h2 className="text-3xl font-bold text-white mb-3">点击进入课堂</h2>
-                    <p className="text-slate-400">全屏模式以获得最佳体验</p>
-                </div>
-            )}
             
             {/* 顶栏 (Header) */}
             <div className="flex items-center justify-between px-6 md:px-8 py-4 bg-white shadow-md z-20 relative h-[72px] shrink-0">

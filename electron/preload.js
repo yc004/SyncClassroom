@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     classStarted: () => ipcRenderer.send('class-started'),
     // 学生端：通知主进程课堂已结束（恢复普通窗口）
     classEnded: () => ipcRenderer.send('class-ended'),
+    // 教师端远程控制学生端全屏开关
+    setFullscreen: (enable) => ipcRenderer.send('set-fullscreen', enable),
     // 获取配置（教师机 IP 等）
     getConfig: () => ipcRenderer.invoke('get-config'),
     // 保存配置（管理员页面使用）
