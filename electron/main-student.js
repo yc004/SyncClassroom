@@ -8,7 +8,13 @@ const {
 } = require('electron');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 const { loadConfig, saveConfig, getAdminPasswordHash } = require('./config.js');
+
+// 切换 Windows 控制台代码页为 UTF-8，解决中文乱码
+if (process.platform === 'win32') {
+    spawnSync('chcp', ['65001'], { shell: true, stdio: 'ignore' });
+}
 
 let mainWindow = null;
 let adminWindow = null;

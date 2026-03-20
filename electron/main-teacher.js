@@ -4,7 +4,12 @@
 // ========================================================
 const { app, BrowserWindow, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
-const { fork } = require('child_process');
+const { fork, spawnSync } = require('child_process');
+
+// 切换 Windows 控制台代码页为 UTF-8，解决中文乱码
+if (process.platform === 'win32') {
+    spawnSync('chcp', ['65001'], { shell: true, stdio: 'ignore' });
+}
 
 let mainWindow = null;
 let tray = null;
@@ -15,13 +20,14 @@ const PORT = 3000;
 function startServer() {
     const serverPath = path.join(__dirname, '..', 'server.js');
     serverProcess = fork(serverPath, [], {
-        env: { ...process.env, PORT: String(PORT) },
+        env: { ...process.env, PORT: String(PORT), CHCP: '65001' },
+        execArgv: [],
         silent: false,
     });
     serverProcess.on('error', (err) => {
         dialog.showErrorBox('服务器启动失败', err.message);
     });
-    console.log('[Teacher] 服务器已启动，PID:', serverProcess.pid);
+    console.log('[Teacher] server started, PID:', serverProcess.pid);
 }
 
 // ── 创建主窗口 ──────────────────────────────────────────
