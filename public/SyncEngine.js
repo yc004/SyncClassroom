@@ -763,12 +763,13 @@ function ClassroomApp() {
             
             const scriptContent = await response.text();
             
-            // 使用 Babel 编译 JSX
+            // 使用 Babel 编译 JSX（.tsx 文件额外启用 typescript preset 剥离类型注解）
             let compiledCode;
             if (window.Babel) {
                 try {
+                    const isTsx = course.file.endsWith('.tsx');
                     const result = window.Babel.transform(scriptContent, {
-                        presets: ['react'],
+                        presets: isTsx ? ['typescript', 'react'] : ['react'],
                         filename: course.file
                     });
                     compiledCode = result.code;
