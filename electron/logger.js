@@ -20,6 +20,7 @@ class Logger {
         this.level = process.env.LOG_LEVEL || 'INFO';
         this.stdoutEnabled = true;
         this.fileEnabled = true;
+        this._consoleInitialized = false;
 
         this.init();
     }
@@ -38,6 +39,10 @@ class Logger {
             // 清理旧日志文件
             this.cleanOldLogs();
 
+            // 使用原始console输出启动信息
+            const originalConsole = this._getOriginalConsole();
+            originalConsole.log('[Logger] Log directory:', this.logDir);
+
             // 写入启动日志
             this.info('Logger initialized', {
                 appName: this.appName,
@@ -49,8 +54,22 @@ class Logger {
                 nodeVersion: process.version
             });
         } catch (err) {
-            console.error('[Logger] Failed to initialize:', err);
+            const originalConsole = this._getOriginalConsole();
+            originalConsole.error('[Logger] Failed to initialize:', err);
         }
+    }
+
+    // 获取原始console对象，防止递归
+    _getOriginalConsole() {
+        if (!this._originalConsole) {
+            this._originalConsole = {
+                log: console.log.bind(console),
+                warn: console.warn.bind(console),
+                error: console.error.bind(console),
+                info: console.info.bind(console)
+            };
+        }
+        return this._originalConsole;
     }
 
     cleanOldLogs() {
@@ -127,25 +146,29 @@ class Logger {
             // 追加写入
             fs.appendFileSync(this.currentLogFile, message + '\n', 'utf-8');
         } catch (err) {
-            console.error('[Logger] Failed to write to file:', err);
+            // 使用原始console避免递归
+            const originalConsole = this._getOriginalConsole();
+            originalConsole.error('[Logger] Failed to write to file:', err);
         }
     }
 
     writeToConsole(message, level) {
         if (!this.stdoutEnabled) return;
 
+        const originalConsole = this._getOriginalConsole();
+
         switch (level) {
             case LOG_LEVELS.ERROR:
-                console.error(message);
+                originalConsole.error(message);
                 break;
             case LOG_LEVELS.WARN:
-                console.warn(message);
+                originalConsole.warn(message);
                 break;
             case LOG_LEVELS.DEBUG:
-                if (this.level === 'DEBUG') console.log(message);
+                if (this.level === 'DEBUG') originalConsole.log(message);
                 break;
             default:
-                console.log(message);
+                originalConsole.log(message);
         }
     }
 

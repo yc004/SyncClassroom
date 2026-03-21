@@ -43,26 +43,6 @@ process.on('unhandledRejection', (reason, promise) => {
     logger.error('UNHANDLED', 'Unhandled Promise Rejection', reason);
 });
 
-// 拦截 console 输出，同时写入日志
-const originalConsole = { ...console };
-['log', 'warn', 'error', 'info'].forEach(method => {
-    console[method] = (...args) => {
-        const message = args.map(arg => {
-            if (typeof arg === 'object') {
-                try {
-                    return JSON.stringify(arg, null, 2);
-                } catch (e) {
-                    return String(arg);
-                }
-            }
-            return String(arg);
-        }).join(' ');
-
-        originalConsole[method].apply(console, args);
-        logger.info('CONSOLE', `[${method.toUpperCase()}] ${message}`);
-    };
-});
-
 // ── 启动内嵌服务器 ──────────────────────────────────────
 function startServer() {
     const serverPath = path.join(__dirname, '..', 'server.js');
