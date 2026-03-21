@@ -142,10 +142,14 @@ async function saveConfig() {
     const ok = await window.electronAPI.saveConfig(config);
     if (ok) {
         const autostart = document.getElementById('cfg-autostart').checked;
-        await window.electronAPI.setAutostart(autostart);
-        document.getElementById('cfg-success').textContent = '保存成功！';
-        document.getElementById('cfg-newpwd').value = '';
-        document.getElementById('cfg-confirmpwd').value = '';
+        const autostartResult = await window.electronAPI.setAutostart(autostart);
+        if (autostartResult.success) {
+            document.getElementById('cfg-success').textContent = '保存成功！';
+            document.getElementById('cfg-newpwd').value = '';
+            document.getElementById('cfg-confirmpwd').value = '';
+        } else {
+            document.getElementById('cfg-error').textContent = autostartResult.error || '开机自启动设置失败';
+        }
     } else {
         document.getElementById('cfg-error').textContent = '保存失败，请重试';
     }

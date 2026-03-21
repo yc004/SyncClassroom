@@ -76,20 +76,50 @@ const RETRY_INTERVAL_MS = 5000; // 每 5 秒重试一次
 // app.setLoginItemSettings 写 HKCU，在管理员身份下无效，改用 reg 命令
 function setAutostartRegistry(enable) {
     const exePath = process.execPath;
+    logger.info('AUTOSTART', 'Setting autostart', { enable, exePath });
+
     if (enable) {
-        spawnSync('reg', [
+        // 在打包后的环境中，确保路径正确
+        const command = `"${exePath}"`;
+        const result = spawnSync('reg', [
             'add', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
             '/v', 'SyncClassroomStudent',
             '/t', 'REG_SZ',
-            '/d', `"${exePath}"`,
+            '/d', command,
             '/f',
-        ], { shell: false, stdio: 'ignore' });
+        ], { shell: false, encoding: 'utf-8' });
+
+        if (result.status !== 0) {
+            logger.error('AUTOSTART', 'Failed to add registry entry', {
+                status: result.status,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                exePath,
+                command
+            });
+            throw new Error('需要管理员权限才能设置开机自启动');
+        } else {
+            logger.info('AUTOSTART', 'Registry entry added successfully', {
+                command
+            });
+        }
     } else {
-        spawnSync('reg', [
+        const result = spawnSync('reg', [
             'delete', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
             '/v', 'SyncClassroomStudent',
             '/f',
-        ], { shell: false, stdio: 'ignore' });
+        ], { shell: false, encoding: 'utf-8' });
+
+        if (result.status !== 0) {
+            logger.error('AUTOSTART', 'Failed to delete registry entry', {
+                status: result.status,
+                stdout: result.stdout,
+                stderr: result.stderr
+            });
+            throw new Error('需要管理员权限才能取消开机自启动');
+        } else {
+            logger.info('AUTOSTART', 'Registry entry deleted successfully');
+        }
     }
 }
 
@@ -98,7 +128,10 @@ function getAutostartRegistry() {
         'query', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
         '/v', 'SyncClassroomStudent',
     ], { shell: false, encoding: 'utf-8' });
-    return result.status === 0;
+
+    const isEnabled = result.status === 0;
+    logger.info('AUTOSTART', 'Checking autostart status', { isEnabled });
+    return isEnabled;
 }
 
 // ── 后台轮询重连 ─────────────────────────────────────────
@@ -389,8 +422,13 @@ ipcMain.handle('get-autostart', () => {
 });
 
 ipcMain.handle('set-autostart', (_, enable) => {
-    setAutostartRegistry(enable);
-    return true;
+    try {
+        setAutostartRegistry(enable);
+        return { success: true };
+    } catch (err) {
+        logger.error('AUTOSTART', 'Failed to set autostart via IPC', err);
+        return { success: false, error: err.message };
+    }
 });
 
 // 手动重试（offline.html 按钮触发）
