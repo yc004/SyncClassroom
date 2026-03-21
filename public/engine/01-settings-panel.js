@@ -21,6 +21,15 @@ function SettingsPanel({ settings, onSettingsChange, socket, onClose, zIndex = '
         });
     };
 
+    const handleOpenLogDir = async () => {
+        try {
+            await window.electronAPI.openLogDir();
+        } catch (err) {
+            console.error('Failed to open log directory:', err);
+            alert('无法打开日志目录');
+        }
+    };
+
     return (
         <div className={`fixed inset-0 ${zIndex} flex justify-end`} onClick={onClose}>
             <div
@@ -91,6 +100,20 @@ function SettingsPanel({ settings, onSettingsChange, socket, onClose, zIndex = '
                                 </p>
                             )}
                         </div>
+                    </div>
+
+                    <div className="border-t border-slate-200 pt-4">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center">
+                            <i className="fas fa-file-alt w-4 mr-2 text-slate-400"></i>
+                            系统日志
+                        </p>
+                        <button
+                            onClick={handleOpenLogDir}
+                            className="w-full py-2 px-3 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <i className="fas fa-folder-open text-slate-500"></i>
+                            打开日志目录
+                        </button>
                     </div>
                 </div>
             </div>

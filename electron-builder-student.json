@@ -8,8 +8,10 @@
   },
   "files": [
     "electron/main-student.js",
+    "electron/main-teacher.js",
     "electron/preload.js",
     "electron/config.js",
+    "electron/logger.js",
     "electron/admin.html",
     "electron/offline.html",
     "assets/**",

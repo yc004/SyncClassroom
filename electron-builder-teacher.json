@@ -8,8 +8,10 @@
   },
   "files": [
     "electron/main-teacher.js",
+    "electron/main-student.js",
     "electron/preload.js",
     "electron/config.js",
+    "electron/logger.js",
     "assets/**",
     "public/**",
     "server.js",
@@ -19,7 +21,7 @@
   "extraMetadata": {
     "main": "electron/main-teacher.js"
   },
-  "asar": true,
+  "asar": false,
   "asarUnpack": [
     "node_modules/node-windows/**"
   ],

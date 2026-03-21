@@ -6,6 +6,10 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, session } 
 const path = require('path');
 const { fork, spawnSync } = require('child_process');
 const { loadSettings, saveSettings } = require('./config.js');
+const { Logger } = require('./logger.js');
+
+// 初始化日志系统
+const logger = new Logger('SyncClassroom-Teacher');
 
 // 切换 Windows 控制台代码页为 UTF-8，解决中文乱码
 if (process.platform === 'win32') {
@@ -29,22 +33,73 @@ let tray = null;
 let serverProcess = null;
 const PORT = 3000;
 
+// 捕获未处理的异常和未捕获的 Promise 拒绝
+process.on('uncaughtException', (err) => {
+    logger.error('UNCAUGHT', 'Uncaught Exception', err);
+    setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('UNHANDLED', 'Unhandled Promise Rejection', reason);
+});
+
+// 拦截 console 输出，同时写入日志
+const originalConsole = { ...console };
+['log', 'warn', 'error', 'info'].forEach(method => {
+    console[method] = (...args) => {
+        const message = args.map(arg => {
+            if (typeof arg === 'object') {
+                try {
+                    return JSON.stringify(arg, null, 2);
+                } catch (e) {
+                    return String(arg);
+                }
+            }
+            return String(arg);
+        }).join(' ');
+
+        originalConsole[method].apply(console, args);
+        logger.info('CONSOLE', `[${method.toUpperCase()}] ${message}`);
+    };
+});
+
 // ── 启动内嵌服务器 ──────────────────────────────────────
 function startServer() {
     const serverPath = path.join(__dirname, '..', 'server.js');
+    logger.info('SERVER', 'Starting server', { path: serverPath, exists: require('fs').existsSync(serverPath) });
+
     serverProcess = fork(serverPath, [], {
-        env: { ...process.env, PORT: String(PORT), CHCP: '65001' },
+        env: { ...process.env, PORT: String(PORT), CHCP: '65001', LOG_DIR: logger.getLogDir() },
         execArgv: [],
         silent: false,
     });
-    serverProcess.on('error', (err) => {
-        dialog.showErrorBox('服务器启动失败', err.message);
+
+    serverProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        logger.info('SERVER-STDOUT', output.trim());
     });
-    console.log('[Teacher] server started, PID:', serverProcess.pid);
+
+    serverProcess.stderr.on('data', (data) => {
+        const output = data.toString();
+        logger.error('SERVER-STDERR', output.trim());
+    });
+
+    serverProcess.on('error', (err) => {
+        logger.error('SERVER', 'Server process error', err);
+        dialog.showErrorBox('服务器启动失败', `${err.message}\n\n详细日志已保存到: ${logger.getLogDir()}`);
+    });
+
+    serverProcess.on('exit', (code, signal) => {
+        logger.info('SERVER', 'Server process exited', { code, signal });
+    });
+
+    logger.info('SERVER', 'Server started successfully', { pid: serverProcess.pid, port: PORT });
 }
 
 // ── 创建主窗口 ──────────────────────────────────────────
 function createWindow() {
+    logger.info('WINDOW', 'Creating main window');
+
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -60,20 +115,75 @@ function createWindow() {
     });
     mainWindow.setMenu(null);
 
+    // 拦截窗口错误
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+        logger.error('WINDOW', 'Failed to load page', {
+            errorCode,
+            errorDescription,
+            url: validatedURL
+        });
+    });
+
+    mainWindow.webContents.on('crashed', (event, killed) => {
+        logger.error('WINDOW', 'WebContents crashed', { killed });
+    });
+
     // 等服务器就绪后加载页面
     const tryLoad = (retries = 20) => {
         const http = require('http');
-        http.get(`http://localhost:${PORT}`, () => {
-            mainWindow.loadURL(`http://localhost:${PORT}`);
-        }).on('error', () => {
-            if (retries > 0) setTimeout(() => tryLoad(retries - 1), 500);
-            else dialog.showErrorBox('连接失败', '无法连接到本地服务器');
+        const options = {
+            hostname: 'localhost',
+            port: PORT,
+            path: '/',
+            method: 'GET',
+            timeout: 2000
+        };
+
+        const req = http.request(options, (res) => {
+            logger.info('WINDOW', 'Server responded', { statusCode: res.statusCode });
+            mainWindow.loadURL(`http://localhost:${PORT}`).catch(err => {
+                logger.error('WINDOW', 'Failed to load URL', err);
+                dialog.showErrorBox('页面加载失败',
+                    `无法加载 http://localhost:${PORT}\n错误: ${err.message}\n\n详细日志已保存到: ${logger.getLogDir()}`
+                );
+            });
         });
+
+        req.on('error', (err) => {
+            logger.error('WINDOW', 'Connection failed', { retries: retries, error: err.message });
+            if (retries > 0) {
+                setTimeout(() => tryLoad(retries - 1), 500);
+            } else {
+                const errorMsg = `无法连接到本地服务器 (http://localhost:${PORT})\n\n` +
+                    `可能的原因：\n` +
+                    `1. 端口 3000 被其他程序占用\n` +
+                    `2. server.js 启动失败（请查看日志）\n` +
+                    `3. 防火墙阻止了本地连接\n\n` +
+                    `错误详情: ${err.message}\n\n` +
+                    `日志目录: ${logger.getLogDir()}`;
+                dialog.showErrorBox('连接失败', errorMsg);
+            }
+        });
+
+        req.setTimeout(2000, () => {
+            req.destroy();
+            logger.error('WINDOW', 'Connection timeout');
+        });
+
+        req.end();
     };
+
+    logger.info('WINDOW', 'Will attempt to load page in 1 second');
     setTimeout(() => tryLoad(), 1000);
 
-    mainWindow.once('ready-to-show', () => mainWindow.show());
-    mainWindow.on('closed', () => { mainWindow = null; });
+    mainWindow.once('ready-to-show', () => {
+        logger.info('WINDOW', 'Window ready to show');
+        mainWindow.show();
+    });
+    mainWindow.on('closed', () => {
+        logger.info('WINDOW', 'Window closed');
+        mainWindow = null;
+    });
 }
 
 // ── 系统托盘 ────────────────────────────────────────────
@@ -82,16 +192,45 @@ function createTray() {
     const icon = nativeImage.createFromPath(iconPath);
     tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
     tray.setToolTip('SyncClassroom 教师端');
-    tray.setContextMenu(Menu.buildFromTemplate([
-        { label: '打开控制台', click: () => { if (mainWindow) mainWindow.show(); else createWindow(); } },
+
+    const menuTemplate = [
+        {
+            label: '打开控制台',
+            click: () => {
+                logger.info('TRAY', 'Opening console from tray');
+                if (mainWindow) mainWindow.show();
+                else createWindow();
+            }
+        },
         { type: 'separator' },
-        { label: '退出', click: () => app.quit() },
-    ]));
-    tray.on('double-click', () => { if (mainWindow) mainWindow.show(); });
+        {
+            label: '打开日志目录',
+            click: () => {
+                logger.info('TRAY', 'Opening log directory');
+                logger.openLogDir();
+            }
+        },
+        { type: 'separator' },
+        {
+            label: '退出',
+            click: () => {
+                logger.info('TRAY', 'Quitting from tray');
+                app.quit();
+            }
+        },
+    ];
+
+    tray.setContextMenu(Menu.buildFromTemplate(menuTemplate));
+    tray.on('double-click', () => {
+        logger.info('TRAY', 'Double clicked');
+        if (mainWindow) mainWindow.show();
+    });
 }
 
 // ── 应用生命周期 ─────────────────────────────────────────
 app.whenReady().then(() => {
+    logger.info('APP', 'Application ready');
+
     // Allow camera/microphone access for course interactions
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
         const allowed = ['media', 'camera', 'microphone', 'display-capture', 'videoCapture', 'audioCapture'];
@@ -101,6 +240,7 @@ app.whenReady().then(() => {
         const allowed = ['media', 'camera', 'microphone', 'display-capture', 'videoCapture', 'audioCapture'];
         return allowed.includes(permission);
     });
+
     startServer();
     createWindow();
     createTray();
@@ -110,6 +250,13 @@ app.whenReady().then(() => {
 ipcMain.handle('get-settings', () => loadSettings());
 ipcMain.handle('save-settings', (_, settings) => saveSettings(settings));
 
+// IPC: 打开日志目录
+ipcMain.handle('open-log-dir', () => {
+    logger.info('IPC', 'Opening log directory requested');
+    logger.openLogDir();
+    return logger.getLogDir();
+});
+
 // IPC: 切换全屏
 ipcMain.on('toggle-fullscreen', () => {
     if (!mainWindow) return;
@@ -118,6 +265,7 @@ ipcMain.on('toggle-fullscreen', () => {
 
 // IPC: 导入课程文件（弹出文件选择对话框，复制到 public/courses/）
 ipcMain.handle('import-course', async () => {
+    logger.info('IPC', 'Import course requested');
     const result = await dialog.showOpenDialog(mainWindow, {
         title: '导入课程文件',
         filters: [{ name: '课程文件', extensions: ['tsx', 'js'] }],
@@ -138,24 +286,34 @@ ipcMain.handle('import-course', async () => {
         try {
             require('fs').copyFileSync(srcPath, destPath);
             imported.push(fileName);
-            console.log(`[import] course imported: ${fileName}`);
+            logger.info('IMPORT', 'Course imported', { fileName });
         } catch (err) {
             skipped.push(fileName);
-            console.error(`[import] failed to copy ${fileName}: ${err.message}`);
+            logger.error('IMPORT', 'Failed to copy course', { fileName, error: err.message });
         }
     }
     return { success: true, imported, skipped };
 });
 
 app.on('window-all-closed', (e) => {
+    logger.info('APP', 'All windows closed, preventing quit to keep server running');
     // 关闭窗口不退出，保持服务器运行
     e.preventDefault();
 });
 
 app.on('before-quit', () => {
-    if (serverProcess) serverProcess.kill();
+    logger.info('APP', 'Application about to quit');
+    if (serverProcess) {
+        logger.info('APP', 'Killing server process', { pid: serverProcess.pid });
+        serverProcess.kill();
+    }
 });
 
 app.on('activate', () => {
+    logger.debug('APP', 'Application activated');
     if (!mainWindow) createWindow();
+});
+
+app.on('quit', () => {
+    logger.info('APP', 'Application quit');
 });

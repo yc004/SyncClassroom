@@ -32,4 +32,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 学生端：读取/设置开机自启动
     getAutostart: () => ipcRenderer.invoke('get-autostart'),
     setAutostart: (enable) => ipcRenderer.invoke('set-autostart', enable),
+    // 教师端：打开日志目录
+    openLogDir: () => ipcRenderer.invoke('open-log-dir'),
 });

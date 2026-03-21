@@ -10,6 +10,10 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 const { loadConfig, saveConfig, getAdminPasswordHash } = require('./config.js');
+const { Logger } = require('./logger.js');
+
+// 初始化日志系统
+const logger = new Logger('SyncClassroom-Student');
 
 // 切换 Windows 控制台代码页为 UTF-8，解决中文乱码
 if (process.platform === 'win32') {
@@ -37,6 +41,16 @@ app.commandLine.appendSwitch('disable-http-cache');
 
 // 跳过 Windows 系统摄像头权限弹窗，避免首次 getUserMedia 等待 5 秒超时
 app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+
+// 捕获未处理的异常
+process.on('uncaughtException', (err) => {
+    logger.error('UNCAUGHT', 'Uncaught Exception', err);
+    setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('UNHANDLED', 'Unhandled Promise Rejection', reason);
+});
 
 let mainWindow = null;
 let adminWindow = null;
