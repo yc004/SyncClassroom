@@ -344,7 +344,12 @@ ipcMain.handle('save-config', async (_, newConfig) => {
                 await mainWindow.loadURL(url);
                 logger.info('CONFIG', 'Window reloaded successfully');
             } catch (err) {
-                logger.error('CONFIG', 'Failed to load URL, showing offline page', err);
+                // 连接被拒绝是正常情况（服务器未启动），只记录为警告
+                if (err.message && err.message.includes('ERR_CONNECTION_REFUSED')) {
+                    logger.warn('CONFIG', 'Server not available, showing offline page');
+                } else {
+                    logger.error('CONFIG', 'Failed to load URL, showing offline page', err);
+                }
                 try {
                     await mainWindow.loadFile(path.join(__dirname, 'offline.html'));
                     startRetrying();
