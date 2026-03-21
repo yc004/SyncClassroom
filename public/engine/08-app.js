@@ -11,6 +11,13 @@ function ClassroomApp() {
     const [isLoading, setIsLoading] = useState(false);
     const [courseError, setCourseError] = useState(null);
     const [copyDone, setCopyDone] = useState(false);
+    const [loadingProgress, setLoadingProgress] = useState({
+        currentStep: '',
+        currentFile: '',
+        progress: 0,
+        totalSteps: 0,
+        currentStepIndex: 0
+    });
 
     const DEFAULT_SETTINGS = {
         forceFullscreen: true,
@@ -132,13 +139,33 @@ function ClassroomApp() {
         setIsLoading(true);
         setCourseError(null);
 
+        // 计算总步骤数
+        let totalSteps = 3; // 基础步骤：获取课程、编译、执行
+        let depCount = 0;
+
         try {
             const scriptUrl = `/courses/${course.file}`;
             window.CourseData = null;
 
+            setLoadingProgress({
+                currentStep: '正在获取课程文件',
+                currentFile: course.file,
+                progress: 5,
+                totalSteps,
+                currentStepIndex: 1
+            });
+
             const response = await fetch(scriptUrl);
             if (!response.ok) throw new Error(`Failed to fetch ${scriptUrl}`);
             const scriptContent = await response.text();
+
+            setLoadingProgress(prev => ({
+                ...prev,
+                currentStep: '正在编译课程脚本',
+                currentFile: course.file,
+                progress: 15,
+                currentStepIndex: 2
+            }));
 
             let compiledCode;
             if (window.Babel) {
@@ -152,6 +179,13 @@ function ClassroomApp() {
             } else {
                 compiledCode = scriptContent;
             }
+
+            setLoadingProgress(prev => ({
+                ...prev,
+                currentStep: '正在执行课程脚本',
+                progress: 25,
+                currentStepIndex: 3
+            }));
 
             try {
                 const runCode = new Function(compiledCode);
@@ -168,41 +202,98 @@ function ClassroomApp() {
             }
 
             if (window.CourseData) {
+                // 计算依赖和模型的步骤数
+                if (window.CourseData.dependencies && window.CourseData.dependencies.length > 0) {
+                    depCount = window.CourseData.dependencies.length;
+                    totalSteps += depCount;
+                }
+                if (window.CourseData.modelsUrls) {
+                    totalSteps += 1;
+                }
+
+                // 更新总步骤数
+                setLoadingProgress(prev => ({ ...prev, totalSteps }));
+
+                // 加载依赖脚本
                 if (window.CourseData.dependencies && window.CourseData.dependencies.length > 0) {
                     const depMappings = window.CourseData.dependencies
                         .filter(d => d.localSrc && d.publicSrc)
                         .map(d => ({ filename: d.localSrc.split('/').pop(), publicSrc: d.publicSrc }));
                     if (depMappings.length > 0) socketRef.current.emit('register-dependencies', depMappings);
 
+                    let depIndex = 0;
                     for (const dep of window.CourseData.dependencies) {
+                        const fileName = dep.localSrc.split('/').pop();
+                        setLoadingProgress({
+                            currentStep: '正在加载依赖脚本',
+                            currentFile: fileName,
+                            progress: 30 + (depIndex / depCount) * 40,
+                            totalSteps,
+                            currentStepIndex: 4 + depIndex
+                        });
                         await loadScriptWithFallback(dep.localSrc, dep.publicSrc);
+                        depIndex++;
                     }
                 }
 
-                window.CourseGlobalContext = {
-                    // 课件调用此方法获取摄像头流，同时通知引擎显示摄像头选择器
-                    // onStream(stream) 可选，每次设备切换时会被回调
-                    getCamera: (onStream) => {
-                        // 通知引擎层激活摄像头选择器
-                        // 用 setTimeout(0) 确保 SyncClassroom 的 useEffect 已完成注册
-                        if (window._onCamActive) {
-                            window._onCamActive(true);
-                        } else {
-                            setTimeout(() => {
-                                if (window._onCamActive) window._onCamActive(true);
-                            }, 0);
-                        }
-                        return window.CameraManager.getStream(onStream);
-                    },
-                    releaseCamera: () => window.CameraManager.release(),
-                    unregisterCamera: (onStream) => window.CameraManager.unregister(onStream),
-                };
+                // 加载模型URL
                 if (window.CourseData.modelsUrls) {
+                    setLoadingProgress({
+                        currentStep: '正在检查模型库可用性',
+                        currentFile: 'face-api models',
+                        progress: 75,
+                        totalSteps,
+                        currentStepIndex: 4 + depCount
+                    });
                     const bestModelUrl = await checkModelUrlValidity(window.CourseData.modelsUrls);
-                    window.CourseGlobalContext.modelUrl = bestModelUrl;
+                    window.CourseGlobalContext = {
+                        modelUrl: bestModelUrl,
+                        getCamera: (onStream) => {
+                            if (window._onCamActive) {
+                                window._onCamActive(true);
+                            } else {
+                                setTimeout(() => {
+                                    if (window._onCamActive) window._onCamActive(true);
+                                }, 0);
+                            }
+                            return window.CameraManager.getStream(onStream);
+                        },
+                        releaseCamera: () => window.CameraManager.release(),
+                        unregisterCamera: (onStream) => window.CameraManager.unregister(onStream),
+                    };
+                } else {
+                    window.CourseGlobalContext = {
+                        getCamera: (onStream) => {
+                            if (window._onCamActive) {
+                                window._onCamActive(true);
+                            } else {
+                                setTimeout(() => {
+                                    if (window._onCamActive) window._onCamActive(true);
+                                }, 0);
+                            }
+                            return window.CameraManager.getStream(onStream);
+                        },
+                        releaseCamera: () => window.CameraManager.release(),
+                        unregisterCamera: (onStream) => window.CameraManager.unregister(onStream),
+                    };
                 }
 
+                setLoadingProgress({
+                    currentStep: '正在初始化课程数据',
+                    progress: 90,
+                    totalSteps,
+                    currentStepIndex: totalSteps - 1
+                });
+
                 setCurrentCourseData(window.CourseData);
+
+                setLoadingProgress({
+                    currentStep: '加载完成',
+                    currentFile: '',
+                    progress: 100,
+                    totalSteps,
+                    currentStepIndex: totalSteps
+                });
             }
         } catch (err) {
             console.error('[ClassroomApp] load course failed:', err);
@@ -252,11 +343,39 @@ function ClassroomApp() {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none">
-                <i className="fas fa-layer-group fa-bounce text-5xl text-purple-500 mb-6"></i>
-                <h2 className="text-2xl tracking-widest font-bold">正在加载课程内容...</h2>
-                <p className="text-slate-400 mt-3 text-sm flex items-center">
-                    <i className="fas fa-bolt text-yellow-400 mr-2"></i> 请稍候
+            <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none px-8">
+                <i className="fas fa-layer-group fa-bounce text-6xl text-purple-500 mb-8"></i>
+
+                <h2 className="text-3xl tracking-widest font-bold mb-3">正在加载课程内容...</h2>
+
+                {/* 进度条 */}
+                <div className="w-80 h-2 bg-slate-700 rounded-full overflow-hidden mb-4">
+                    <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300 ease-out"
+                        style={{ width: `${loadingProgress.progress}%` }}
+                    ></div>
+                </div>
+
+                {/* 当前步骤和文件 */}
+                <div className="text-center space-y-2">
+                    <p className="text-lg text-slate-200 font-medium">
+                        {loadingProgress.currentStep}
+                    </p>
+                    {loadingProgress.currentFile && (
+                        <p className="text-sm text-slate-400 font-mono flex items-center justify-center">
+                            <i className="fas fa-file-code mr-2 text-yellow-400"></i>
+                            {loadingProgress.currentFile}
+                        </p>
+                    )}
+                </div>
+
+                {/* 步骤进度 */}
+                <div className="mt-6 text-sm text-slate-500">
+                    步骤 {loadingProgress.currentStepIndex} / {loadingProgress.totalSteps}
+                </div>
+
+                <p className="text-slate-400 mt-4 text-sm flex items-center">
+                    <i className="fas fa-bolt text-yellow-400 mr-2"></i> 请稍候，正在准备课堂环境
                 </p>
             </div>
         );
@@ -299,11 +418,11 @@ function ClassroomApp() {
 
     if (!currentCourseData) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none">
-                <i className="fas fa-layer-group fa-bounce text-5xl text-purple-500 mb-6"></i>
-                <h2 className="text-2xl tracking-widest font-bold">正在加载课程内容...</h2>
-                <p className="text-slate-400 mt-3 text-sm flex items-center">
-                    <i className="fas fa-bolt text-yellow-400 mr-2"></i> 请稍候
+            <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white select-none px-8">
+                <i className="fas fa-layer-group fa-bounce text-6xl text-purple-500 mb-8"></i>
+                <h2 className="text-3xl tracking-widest font-bold mb-3">正在加载课程内容...</h2>
+                <p className="text-slate-400 mt-4 text-sm flex items-center">
+                    <i className="fas fa-bolt text-yellow-400 mr-2"></i> 请稍候，正在准备课堂环境
                 </p>
             </div>
         );
