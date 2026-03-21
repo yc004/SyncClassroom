@@ -303,22 +303,34 @@ ipcMain.on('set-fullscreen', (_, enable) => {
 
 ipcMain.handle('get-config', () => ({ ...config, adminPasswordHash: undefined }));
 
-ipcMain.handle('save-config', (_, newConfig) => {
+ipcMain.handle('save-config', async (_, newConfig) => {
+    logger.info('CONFIG', 'save-config called', { hasQuitFlag: !!newConfig._quit, keys: Object.keys(newConfig) });
+
     // 特殊标志：管理员请求退出
-    if (newConfig._quit) {
+    // 只有当 newConfig 只有 _quit 一个属性时才认为是退出请求
+    if (Object.keys(newConfig).length === 1 && newConfig._quit) {
+        logger.info('CONFIG', 'Quit requested via save-config');
         app.exit(0);
         return true;
     }
-    config = { ...config, ...newConfig };
+
+    // 移除 _quit 属性（如果有），防止污染配置
+    const { _quit, ...cleanConfig } = newConfig;
+    config = { ...config, ...cleanConfig };
     const ok = saveConfig(config);
     if (ok && mainWindow) {
+        logger.info('CONFIG', 'Config saved, reloading window', { teacherIp: config.teacherIp, port: config.port });
         stopRetrying();
         // 重新加载新 IP
         const url = `http://${config.teacherIp}:${config.port || 3000}`;
-        mainWindow.loadURL(url).catch(() => {
-            mainWindow.loadFile(path.join(__dirname, 'offline.html'));
+        try {
+            await mainWindow.loadURL(url);
+            logger.info('CONFIG', 'Window reloaded successfully');
+        } catch (err) {
+            logger.error('CONFIG', 'Failed to load URL, showing offline page', err);
+            await mainWindow.loadFile(path.join(__dirname, 'offline.html'));
             startRetrying();
-        });
+        }
     }
     return ok;
 });
@@ -380,10 +392,17 @@ app.whenReady().then(() => {
 });
 
 // 阻止所有窗口关闭时退出
-app.on('window-all-closed', (e) => e.preventDefault());
+app.on('window-all-closed', (e) => {
+    logger.info('APP', 'window-all-closed event, preventing exit');
+    e.preventDefault();
+});
 
 // 阻止系统级退出（如注销时）——普通用户无法通过任务管理器结束 Electron 进程
 // 真正的防杀需配合 Windows 服务守护（见 service-install.js）
 app.on('before-quit', (e) => {
-    if (isClassActive) e.preventDefault();
+    logger.info('APP', 'before-quit event', { isClassActive });
+    if (isClassActive) {
+        logger.info('APP', 'Preventing quit because class is active');
+        e.preventDefault();
+    }
 });
