@@ -35,12 +35,27 @@ if (process.argv.includes('--register-service')) {
     process.exit(0);
 }
 
+// 记录启动信息
+logger.info('BOOT', 'Application started', {
+    execPath: process.execPath,
+    platform: process.platform,
+    arch: process.arch,
+    pid: process.pid,
+    args: process.argv
+});
+
 // 禁用 GPU 磁盘缓存，避免 Windows 上因缓存目录锁定导致的启动报错
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-http-cache');
 
 // 跳过 Windows 系统摄像头权限弹窗，避免首次 getUserMedia 等待 5 秒超时
 app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+
+// 在无桌面环境（如开机启动）下避免使用 GPU 加速
+app.commandLine.appendSwitch('disable-software-rasterizer');
+
+// 设置代理为系统代理，避免网络问题
+app.commandLine.appendSwitch('no-proxy-server');
 
 // 捕获未处理的异常
 process.on('uncaughtException', (err) => {
@@ -72,66 +87,62 @@ const RETRY_INTERVAL_MS = 5000; // 每 5 秒重试一次
 }
 
 // ── 开机自启（默认开启，可在管理员设置中修改）──────────
-// perMachine 安装在 Program Files，必须写 HKLM 才对所有用户生效
-// app.setLoginItemSettings 写 HKCU，在管理员身份下无效，改用 reg 命令
-function setAutostartRegistry(enable) {
-    const exePath = process.execPath;
-    logger.info('AUTOSTART', 'Setting autostart', { enable, exePath });
+// 使用注册表（Windows）/ 登录项（macOS）/ auto-launch（Linux）
+const { AutoLauncher } = require('./task-scheduler-autostart.js');
 
-    if (enable) {
-        // 在打包后的环境中，确保路径正确
-        const command = `"${exePath}"`;
-        const result = spawnSync('reg', [
-            'add', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
-            '/v', 'SyncClassroomStudent',
-            '/t', 'REG_SZ',
-            '/d', command,
-            '/f',
-        ], { shell: false, encoding: 'utf-8' });
+let autoLauncher = null;
 
-        if (result.status !== 0) {
-            logger.error('AUTOSTART', 'Failed to add registry entry', {
-                status: result.status,
-                stdout: result.stdout,
-                stderr: result.stderr,
-                exePath,
-                command
-            });
-            throw new Error('需要管理员权限才能设置开机自启动');
-        } else {
-            logger.info('AUTOSTART', 'Registry entry added successfully', {
-                command
-            });
-        }
-    } else {
-        const result = spawnSync('reg', [
-            'delete', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
-            '/v', 'SyncClassroomStudent',
-            '/f',
-        ], { shell: false, encoding: 'utf-8' });
+// 应用初始化后创建 AutoLauncher 实例
+function initAutoLauncher() {
+    if (!autoLauncher) {
+        autoLauncher = new AutoLauncher(
+            app.getName(),
+            app.getPath('exe')
+        );
+    }
+    return autoLauncher;
+}
 
-        if (result.status !== 0) {
-            logger.error('AUTOSTART', 'Failed to delete registry entry', {
-                status: result.status,
-                stdout: result.stdout,
-                stderr: result.stderr
-            });
-            throw new Error('需要管理员权限才能取消开机自启动');
-        } else {
-            logger.info('AUTOSTART', 'Registry entry deleted successfully');
-        }
+async function setAutostartRegistry(enable) {
+    // 开发环境跳过
+    if (!app.isPackaged) {
+        logger.info('AUTOSTART', '开发模式，跳过自启动设置');
+        return true;
+    }
+
+    const launcher = initAutoLauncher();
+    logger.info('AUTOSTART', 'Setting autostart', {
+        enable,
+        exePath: app.getPath('exe'),
+        isPackaged: app.isPackaged
+    });
+
+    try {
+        await launcher.enable(enable);
+        logger.info('AUTOSTART', enable ? 'Autostart enabled' : 'Autostart disabled');
+        return true;
+    } catch (err) {
+        logger.error('AUTOSTART', 'Error setting autostart', err);
+        throw new Error('设置开机自启动失败');
     }
 }
 
-function getAutostartRegistry() {
-    const result = spawnSync('reg', [
-        'query', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
-        '/v', 'SyncClassroomStudent',
-    ], { shell: false, encoding: 'utf-8' });
+async function getAutostartRegistry() {
+    // 开发环境返回 false
+    if (!app.isPackaged) {
+        logger.info('AUTOSTART', '开发模式，自启动状态: false');
+        return false;
+    }
 
-    const isEnabled = result.status === 0;
-    logger.info('AUTOSTART', 'Checking autostart status', { isEnabled });
-    return isEnabled;
+    const launcher = initAutoLauncher();
+    try {
+        const isEnabled = await launcher.isEnabled();
+        logger.info('AUTOSTART', 'Checking autostart status', { isEnabled });
+        return isEnabled;
+    } catch (err) {
+        logger.error('AUTOSTART', 'Error checking autostart status', err);
+        return false;
+    }
 }
 
 // ── 后台轮询重连 ─────────────────────────────────────────
@@ -290,10 +301,15 @@ function openAdminWindow() {
 
 // ── 系统托盘 ─────────────────────────────────────────────
 function createTray() {
+    logger.info('TRAY', 'Creating system tray');
+
     const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
+    logger.debug('TRAY', 'Tray icon path', { iconPath, exists: require('fs').existsSync(iconPath) });
+
     const icon = nativeImage.createFromPath(iconPath);
     tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
     tray.setToolTip('SyncClassroom 学生端');
+    logger.info('TRAY', 'Tray created successfully');
 
     const menu = Menu.buildFromTemplate([
         { label: '显示窗口', click: () => mainWindow && mainWindow.show() },
@@ -309,6 +325,8 @@ function createTray() {
     ]);
     tray.setContextMenu(menu);
     tray.on('double-click', () => mainWindow && mainWindow.show());
+
+    logger.info('TRAY', 'Tray menu set up complete');
 }
 
 // ── IPC 处理 ─────────────────────────────────────────────
@@ -417,13 +435,13 @@ ipcMain.on('set-admin-password', (_, hash) => {
     console.log('[admin] password updated remotely');
 });
 
-ipcMain.handle('get-autostart', () => {
-    return getAutostartRegistry();
+ipcMain.handle('get-autostart', async () => {
+    return await getAutostartRegistry();
 });
 
-ipcMain.handle('set-autostart', (_, enable) => {
+ipcMain.handle('set-autostart', async (_, enable) => {
     try {
-        setAutostartRegistry(enable);
+        await setAutostartRegistry(enable);
         return { success: true };
     } catch (err) {
         logger.error('AUTOSTART', 'Failed to set autostart via IPC', err);
@@ -444,7 +462,10 @@ ipcMain.on('manual-retry', () => {
 });
 
 // ── 应用生命周期 ─────────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    logger.info('APP', 'App is ready, initializing');
+    logger.info('APP', 'Creating main window');
+
     // Allow camera/microphone access for course interactions
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
         const allowed = ['media', 'camera', 'microphone', 'display-capture', 'videoCapture', 'audioCapture'];
@@ -454,8 +475,23 @@ app.whenReady().then(() => {
         const allowed = ['media', 'camera', 'microphone', 'display-capture', 'videoCapture', 'audioCapture'];
         return allowed.includes(permission);
     });
+
     createMainWindow();
+
+    logger.info('APP', 'Creating system tray');
     createTray();
+
+    logger.info('APP', 'App initialization complete');
+
+    // 检查自启动状态
+    try {
+        const autostartEnabled = await getAutostartRegistry();
+        logger.info('AUTOSTART', 'Startup complete, autostart status', {
+            enabled: autostartEnabled
+        });
+    } catch (err) {
+        logger.warn('AUTOSTART', 'Failed to check autostart status', err);
+    }
 });
 
 // 阻止所有窗口关闭时退出

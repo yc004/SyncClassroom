@@ -5,12 +5,15 @@
 
 !include LogicLib.nsh
 
-; ── Install: register Windows service + autostart registry ──
+; ── Install: register Windows service only ──
 !macro customInstall
     DetailPrint "Registering student daemon service..."
     nsExec::ExecToLog '"$INSTDIR\SyncClassroom Student.exe" --register-service'
-    DetailPrint "Adding autostart registry entry..."
-    WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "SyncClassroomStudent" '"$INSTDIR\SyncClassroom Student.exe"'
+    DetailPrint "Cleaning up old autostart entries..."
+    ; 清理旧的注册表启动项（如果有）
+    DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "SyncClassroomStudent"
+    ; 清理旧的任务计划（如果有）
+    nsExec::ExecToLog 'schtasks /delete /tn SyncClassroomStudentAutostart /f'
 !macroend
 
 ; ── customUnInit: password check BEFORE any files are removed ─
@@ -61,6 +64,9 @@
     DetailPrint "Stopping daemon service..."
     nsExec::ExecToLog 'sc stop "SyncClassroomStudent"'
     nsExec::ExecToLog 'sc delete "SyncClassroomStudent"'
-    DetailPrint "Removing autostart registry entry..."
+    DetailPrint "Cleaning up autostart entries..."
+    ; 清理任务计划（如果有）
+    nsExec::ExecToLog 'schtasks /delete /tn SyncClassroomStudentAutostart /f'
+    ; 清理注册表启动项（如果有）
     DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "SyncClassroomStudent"
 !macroend

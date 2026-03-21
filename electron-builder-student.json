@@ -12,11 +12,17 @@
     "electron/preload.js",
     "electron/config.js",
     "electron/logger.js",
+    "electron/task-scheduler-autostart.js",
     "electron/admin.html",
     "electron/offline.html",
     "assets/**",
     "package.json",
-    "node_modules/**"
+    "node_modules/auto-launch/**",
+    "node_modules/winreg/**",
+    "node_modules/applescript/**",
+    "node_modules/mkdirp/**",
+    "node_modules/path-is-absolute/**",
+    "node_modules/untildify/**"
   ],
   "extraResources": [
     {
@@ -36,7 +42,7 @@
       }
     ],
     "icon": "build/icon-student.ico",
-    "requestedExecutionLevel": "requireAdministrator"
+    "requestedExecutionLevel": "asInvoker"
   },
   "nsis": {
     "oneClick": false,
