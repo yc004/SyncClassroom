@@ -48,32 +48,48 @@ function startServer() {
     const serverPath = path.join(__dirname, '..', 'server.js');
     logger.info('SERVER', 'Starting server', { path: serverPath, exists: require('fs').existsSync(serverPath) });
 
-    serverProcess = fork(serverPath, [], {
-        env: { ...process.env, PORT: String(PORT), CHCP: '65001', LOG_DIR: logger.getLogDir() },
-        execArgv: [],
-        silent: false,
-    });
+    try {
+        serverProcess = fork(serverPath, [], {
+            env: { ...process.env, PORT: String(PORT), CHCP: '65001', LOG_DIR: logger.getLogDir() },
+            execArgv: [],
+            silent: false,
+        });
 
-    serverProcess.stdout.on('data', (data) => {
-        const output = data.toString();
-        logger.info('SERVER-STDOUT', output.trim());
-    });
+        if (!serverProcess) {
+            throw new Error('Failed to create server process');
+        }
 
-    serverProcess.stderr.on('data', (data) => {
-        const output = data.toString();
-        logger.error('SERVER-STDERR', output.trim());
-    });
+        // 监听 stdout (需要检查对象是否存在)
+        if (serverProcess.stdout) {
+            serverProcess.stdout.on('data', (data) => {
+                const output = data.toString();
+                logger.info('SERVER-STDOUT', output.trim());
+            });
+        }
 
-    serverProcess.on('error', (err) => {
-        logger.error('SERVER', 'Server process error', err);
+        // 监听 stderr
+        if (serverProcess.stderr) {
+            serverProcess.stderr.on('data', (data) => {
+                const output = data.toString();
+                logger.error('SERVER-STDERR', output.trim());
+            });
+        }
+
+        serverProcess.on('error', (err) => {
+            logger.error('SERVER', 'Server process error', err);
+            dialog.showErrorBox('服务器启动失败', `${err.message}\n\n详细日志已保存到: ${logger.getLogDir()}`);
+        });
+
+        serverProcess.on('exit', (code, signal) => {
+            logger.info('SERVER', 'Server process exited', { code, signal });
+        });
+
+        logger.info('SERVER', 'Server started successfully', { pid: serverProcess.pid, port: PORT });
+    } catch (err) {
+        logger.error('SERVER', 'Failed to start server', err);
         dialog.showErrorBox('服务器启动失败', `${err.message}\n\n详细日志已保存到: ${logger.getLogDir()}`);
-    });
-
-    serverProcess.on('exit', (code, signal) => {
-        logger.info('SERVER', 'Server process exited', { code, signal });
-    });
-
-    logger.info('SERVER', 'Server started successfully', { pid: serverProcess.pid, port: PORT });
+        throw err;
+    }
 }
 
 // ── 创建主窗口 ──────────────────────────────────────────
