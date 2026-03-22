@@ -54,6 +54,9 @@ jobs:
       - name: Build Student installer
         run: npx electron-builder --config electron-builder-student.json --publish never
 
+      - name: Build Editor installer
+        run: npm run build:editor -- --publish never
+
       - name: Get tag name
         id: tag
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $env:GITHUB_OUTPUT
@@ -65,6 +68,10 @@ jobs:
             if ($_.Name -ne $newName) { Rename-Item $_.FullName $newName }
           }
           Get-ChildItem "dist/student/*.exe" | ForEach-Object {
+            $newName = $_.Name -replace ' ', '-'
+            if ($_.Name -ne $newName) { Rename-Item $_.FullName $newName }
+          }
+          Get-ChildItem "dist/editor/*.exe" | ForEach-Object {
             $newName = $_.Name -replace ' ', '-'
             if ($_.Name -ne $newName) { Rename-Item $_.FullName $newName }
           }
@@ -85,6 +92,7 @@ jobs:
             |------|-------------|
             | `SyncClassroom-Teacher-Setup-*.exe` | Teacher installer, normal uninstall |
             | `SyncClassroom-Student-Setup-*.exe` | Student installer, requires admin password to uninstall (default: `admin123`) |
+            | `SyncClassroom-Editor-Setup-*.exe` | AI Courseware Editor installer, integrated AI assistant |
 
             ### Offline Install
             Both installers are fully self-contained. No internet connection required after installation.
@@ -96,5 +104,6 @@ jobs:
           files: |
             dist/teacher/SyncClassroom-Teacher-Setup-*.exe
             dist/student/SyncClassroom-Student-Setup-*.exe
+            dist/editor/SyncClassroom-Editor-Setup-*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

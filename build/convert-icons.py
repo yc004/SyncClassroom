@@ -10,18 +10,15 @@ import io
 import struct
 from PIL import Image
 
-src = os.path.join(os.path.dirname(__file__), '..', 'assets', 'tray-icon.png')
+src_teacher = os.path.join(os.path.dirname(__file__), '..', 'assets', 'tray-icon.png')
+src_editor  = os.path.join(os.path.dirname(__file__), '..', 'assets', 'editor-icon.png')
 out_teacher = os.path.join(os.path.dirname(__file__), 'icon-teacher.ico')
-out_student  = os.path.join(os.path.dirname(__file__), 'icon-student.ico')
+out_student = os.path.join(os.path.dirname(__file__), 'icon-student.ico')
+out_editor  = os.path.join(os.path.dirname(__file__), 'icon-editor.ico')
 
-if not os.path.exists(src):
-    print('[icons] ERROR: source icon not found: ' + src)
+if not os.path.exists(src_teacher):
+    print('[icons] ERROR: source teacher icon not found: ' + src_teacher)
     sys.exit(1)
-
-img = Image.open(src).convert('RGBA')
-print('[icons] source size: ' + str(img.size))
-
-SIZES = [16, 32, 48, 64, 128, 256]
 
 def build_ico(base_img, sizes):
     """
@@ -73,13 +70,28 @@ def build_ico(base_img, sizes):
 
     return out.getvalue()
 
-ico_data = build_ico(img, SIZES)
+def generate_ico(src_path, out_path, sizes):
+    if not os.path.exists(src_path):
+        print(f'[icons] WARNING: {src_path} not found, using fallback.')
+        return False
+    
+    img = Image.open(src_path).convert('RGBA')
+    print(f'[icons] source {os.path.basename(src_path)} size: {img.size}')
+    
+    ico_data = build_ico(img, sizes)
+    with open(out_path, 'wb') as f:
+        f.write(ico_data)
+    print(f'[icons] OK: {out_path}')
+    return True
 
-with open(out_teacher, 'wb') as f:
-    f.write(ico_data)
-with open(out_student, 'wb') as f:
-    f.write(ico_data)
+SIZES = [16, 32, 48, 64, 128, 256]
 
-print('[icons] sizes embedded: ' + str(SIZES))
-print('[icons] OK: ' + out_teacher)
-print('[icons] OK: ' + out_student)
+# Generate Teacher/Student icons from tray-icon.png
+generate_ico(src_teacher, out_teacher, SIZES)
+generate_ico(src_teacher, out_student, SIZES)
+
+# Generate Editor icon (prefer editor-icon.png, fallback to tray-icon.png)
+if not generate_ico(src_editor, out_editor, SIZES):
+    generate_ico(src_teacher, out_editor, SIZES)
+
+print('[icons] All icons processed.')

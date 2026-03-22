@@ -58,10 +58,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM 打包编辑器端
+echo [INFO] 打包编辑器端安装包...
+call npm run build:editor
+if errorlevel 1 (
+    echo [ERROR] 编辑器端打包失败
+    pause
+    exit /b 1
+)
+
 echo.
 echo =========================================
 echo [OK] 打包完成！
 echo [OK] 教师端安装包: dist\teacher\
 echo [OK] 学生端安装包: dist\student\
+echo [OK] 编辑器端安装包: dist\editor\
 echo =========================================
 pause

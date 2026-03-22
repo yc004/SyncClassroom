@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setAutostart: (enable) => ipcRenderer.invoke('set-autostart', enable),
     // 教师端：打开日志目录
     openLogDir: () => ipcRenderer.invoke('open-log-dir'),
+    getLogDir: () => ipcRenderer.invoke('get-log-dir'),
     // 窗口控制：最小化、最大化/还原、关闭
     minimizeWindow: () => ipcRenderer.send('minimize-window'),
     maximizeWindow: () => ipcRenderer.send('maximize-window'),
@@ -47,4 +48,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAIConfig: () => ipcRenderer.invoke('get-ai-config'),
     saveAIConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
     saveCourse: (data) => ipcRenderer.invoke('save-course', data),
+    openCourseFile: () => ipcRenderer.invoke('open-course-file'),
+    saveCourseFile: (data) => ipcRenderer.invoke('save-course-file', data),
+    editorLog: (payload) => ipcRenderer.invoke('editor-log', payload),
+    testAIConnection: (payload) => ipcRenderer.invoke('test-ai-connection', payload),
+    proxyAIChat: (payload) => ipcRenderer.send('proxy-ai-chat', payload),
+    onAIChatData: (requestId, callback) => {
+        const listener = (event, data) => callback(data);
+        ipcRenderer.on(`ai-chat-data-${requestId}`, listener);
+        return () => ipcRenderer.removeListener(`ai-chat-data-${requestId}`, listener);
+    },
+    onAIChatError: (requestId, callback) => {
+        const listener = (event, data) => callback(data);
+        ipcRenderer.on(`ai-chat-error-${requestId}`, listener);
+        return () => ipcRenderer.removeListener(`ai-chat-error-${requestId}`, listener);
+    },
 });

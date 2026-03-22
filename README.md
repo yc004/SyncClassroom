@@ -23,7 +23,8 @@
 - **🖥️ 机房视图** - 座位网格/列表双视图，支持 CSV 批量导入，拖拽排列，实时在线状态
 - **🌐 智能 CDN 缓存代理** - 首次从公网下载依赖后缓存到本地，后续完全离线
 - **⚡ JSX 热编译** - 课件为纯文本 `.tsx` 文件，无需构建工具
-- **💻 Electron 桌面应用** - 教师端/学生端独立安装包，学生端卸载需管理员密码
+- **🤖 AI 课件编辑器** - 集成 AI 助手，支持对话式生成互动课件，提供实时预览与源码编辑
+- **💻 Electron 桌面应用** - 教师端/学生端/编辑器独立安装包，学生端卸载需管理员密码
 - **🎨 现代化 UI** - 基于 Tailwind CSS 的精美界面设计
 
 ---
@@ -61,11 +62,12 @@ node server.js
 |------|------|
 | `LumeSync Teacher Setup *.exe` | 教师端，正常安装卸载 |
 | `LumeSync Student Setup *.exe` | 学生端，卸载需管理员密码（默认 `admin123`） |
+| `LumeSync Editor Setup *.exe` | AI 课件编辑器，集成 AI 对话生成功能 |
 
 ### 本地打包
 
 ```bash
-# 一键打包（生成教师端 + 学生端安装包）
+# 一键打包（生成教师端 + 学生端 + 编辑器安装包）
 build\build.bat
 
 # 或分步执行
@@ -73,6 +75,7 @@ python build/convert-icons.py       # 生成图标
 npm run build:verify                # 打包密码验证工具
 npm run build:teacher               # 教师端安装包 -> dist/teacher/
 npm run build:student               # 学生端安装包 -> dist/student/
+npm run build:editor                # 编辑器安装包 -> dist/editor/
 ```
 
 详细打包说明见 [build/BUILD-README.md](build/BUILD-README.md)。
@@ -178,8 +181,10 @@ window.CourseData = {
 ├── electron/
 │   ├── main-teacher.js                # 教师端主进程
 │   ├── main-student.js                # 学生端主进程
+│   ├── main-editor.js                 # 编辑器端主进程
 │   ├── preload.js                     # IPC 桥接
 │   ├── config.js                      # 配置读写
+│   ├── logger.js                      # 日志系统
 │   ├── admin.html                     # 管理员设置页面
 │   └── offline.html                   # 离线提示页面
 ├── build/
@@ -191,6 +196,7 @@ window.CourseData = {
 │   └── tray-icon.png                  # 应用图标
 ├── electron-builder-teacher.json      # 教师端打包配置
 ├── electron-builder-student.json      # 学生端打包配置
+├── electron-builder-editor.json       # 编辑器端打包配置
 ├── docs/                              # 文档目录
 │   ├── course-template.md            # 课件开发模板
 │   ├── API.md                         # 课件 API 文档

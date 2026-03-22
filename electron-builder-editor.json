@@ -9,6 +9,8 @@
   "files": [
     "electron/main-editor.js",
     "electron/preload.js",
+    "electron/logger.js",
+    "build/icon-editor.ico",
     "assets/**",
     "public/**",
     "node_modules/**",
@@ -25,7 +27,8 @@
         "arch": ["x64"]
       }
     ],
-    "requestedExecutionLevel": "asInvoker"
+    "requestedExecutionLevel": "asInvoker",
+    "icon": "build/icon-editor.ico"
   },
   "nsis": {
     "oneClick": false,
@@ -35,6 +38,9 @@
     "language": "2052",
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "LumeSync Editor"
+    "shortcutName": "LumeSync Editor",
+    "installerIcon": "build/icon-editor.ico",
+    "uninstallerIcon": "build/icon-editor.ico",
+    "installerHeaderIcon": "build/icon-editor.ico"
   }
 }

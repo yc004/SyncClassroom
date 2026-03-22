@@ -5,6 +5,8 @@
 // 简化的预览组件，用于编辑器中预览课件
 function SimplePreview({ title, slides }) {
     const [currentSlide, setCurrentSlide] = useState(0);
+    const containerRef = useRef(null);
+    const [scale, setScale] = useState(1);
 
     const nextSlide = () => {
         if (currentSlide < slides.length - 1) setCurrentSlide(currentSlide + 1);
@@ -13,6 +15,37 @@ function SimplePreview({ title, slides }) {
     const prevSlide = () => {
         if (currentSlide > 0) setCurrentSlide(currentSlide - 1);
     };
+
+    // 实现自适应缩放以保持 16:9
+    useEffect(() => {
+        const updateScale = () => {
+            if (!containerRef.current) return;
+            const parent = containerRef.current.parentElement;
+            if (!parent) return;
+
+            const padding = 32; // 容器内边距
+            const availableWidth = parent.clientWidth - padding;
+            const availableHeight = parent.clientHeight - padding;
+
+            // 16:9 的标准尺寸
+            const baseWidth = 1280;
+            const baseHeight = 720;
+
+            const scaleW = availableWidth / baseWidth;
+            const scaleH = availableHeight / baseHeight;
+            const newScale = Math.min(scaleW, scaleH, 1); // 不放大，只缩小
+
+            setScale(newScale);
+        };
+
+        const resizeObserver = new ResizeObserver(updateScale);
+        if (containerRef.current?.parentElement) {
+            resizeObserver.observe(containerRef.current.parentElement);
+        }
+        updateScale();
+
+        return () => resizeObserver.disconnect();
+    }, []);
 
     return (
         <div className="flex flex-col h-full bg-slate-900">
@@ -31,9 +64,19 @@ function SimplePreview({ title, slides }) {
                 </div>
             </div>
 
-            {/* 课件展示区 */}
-            <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
-                <div className="bg-white relative shadow-2xl flex flex-col rounded-xl w-full h-full max-w-4xl overflow-y-auto">
+            {/* 课件展示区 - 强制 16:9 */}
+            <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden bg-slate-950">
+                <div 
+                    ref={containerRef}
+                    style={{ 
+                        width: '1280px', 
+                        height: '720px', 
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'center center',
+                        transition: 'transform 0.2s ease-out'
+                    }}
+                    className="bg-white relative shadow-2xl flex flex-col rounded-xl overflow-hidden shrink-0"
+                >
                     {slides[currentSlide] && slides[currentSlide].component}
                 </div>
             </div>
@@ -84,6 +127,38 @@ function ErrorBoundary({ error }) {
     );
 }
 
+// 正在生成状态组件（带计时器）
+function GeneratingStatus() {
+    const [seconds, setSeconds] = useState(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setSeconds(s => s + 1);
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-900/50 backdrop-blur-sm">
+            <div className="relative mb-6">
+                <i className="fas fa-robot text-5xl text-blue-500 animate-pulse"></i>
+                <div className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                </div>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">AI 正在努力生成中...</h3>
+            <p className="text-slate-400 mb-4 text-center max-w-xs">
+                正在根据您的要求编写互动课件代码，生成完成后将自动进行实时预览。
+            </p>
+            <div className="flex items-center space-x-2 bg-slate-800 px-4 py-2 rounded-full border border-slate-700 shadow-lg">
+                <i className="fas fa-clock text-blue-400"></i>
+                <span className="font-mono text-blue-400 font-bold">{seconds}s</span>
+            </div>
+        </div>
+    );
+}
+
 function EditorApp() {
     const [code, setCode] = useState(`// 在此编写你的 TypeScript 课件代码，或者通过右侧 AI 助手自动生成
 window.CourseData = {
@@ -101,11 +176,34 @@ window.CourseData = {
 };`);
     
     const [viewMode, setViewMode] = useState('preview'); // 'preview' | 'code'
+    const [isAIGenerating, setIsAIGenerating] = useState(false);
     const [compiledCourseData, setCompiledCourseData] = useState(null);
     const [compileError, setCompileError] = useState(null);
     const [isCompiling, setIsCompiling] = useState(false);
     const [saveStatus, setSaveStatus] = useState('');
+    const [currentFilePath, setCurrentFilePath] = useState('');
+    const [currentFileName, setCurrentFileName] = useState('');
     const fileInputRef = useRef(null);
+    const textareaRef = useRef(null);
+    const lineNumbersRef = useRef(null);
+
+    const handleScroll = () => {
+        if (textareaRef.current && lineNumbersRef.current) {
+            lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+        }
+    };
+
+    const lineCount = code.split('\n').length;
+    const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
+
+    const getDefaultFilename = () => {
+        let defaultFilename = 'untitled.tsx';
+        const idMatch = code.match(/id:\s*['"]([^'"]+)['"]/);
+        if (idMatch && idMatch[1]) {
+            defaultFilename = `${idMatch[1]}.tsx`;
+        }
+        return defaultFilename;
+    };
 
     const runCode = (sourceCode) => {
         setIsCompiling(true);
@@ -142,6 +240,9 @@ window.CourseData = {
 
     // 初次加载和代码变更时尝试编译
     useEffect(() => {
+        // AI 正在生成时暂停自动编译，避免由于代码不完整导致的语法错误提示
+        if (isAIGenerating) return;
+
         // 使用防抖避免频繁编译
         const timer = setTimeout(() => {
             if (viewMode === 'preview') {
@@ -149,12 +250,18 @@ window.CourseData = {
             }
         }, 800);
         return () => clearTimeout(timer);
-    }, [code, viewMode]);
+    }, [code, viewMode, isAIGenerating]);
 
     const handleAIGeneratedCode = (newCode) => {
         setCode(newCode);
-        setViewMode('preview');
-        runCode(newCode); // 立即编译预览
+        // 不再强制跳转到预览视图，保持用户当前的视图模式 (预览或源码)
+        // setViewMode('preview');
+        
+        // AI 正在生成时，不执行实时编译，防止显示中间过程的语法错误
+        // 编译将由 useEffect 在生成结束 (isAIGenerating 变为 false) 时统一触发
+        if (viewMode === 'preview' && !isAIGenerating) {
+            runCode(newCode);
+        }
     };
 
     const handleImport = (event) => {
@@ -166,6 +273,8 @@ window.CourseData = {
             const content = e.target.result;
             setCode(content);
             setViewMode('code');
+            setCurrentFilePath('');
+            setCurrentFileName(file.name);
             runCode(content); // 立即编译预览
             setSaveStatus(`已导入: ${file.name}`);
             setTimeout(() => setSaveStatus(''), 3000);
@@ -207,6 +316,60 @@ window.CourseData = {
         }
     };
 
+    const handleOpenCourse = async () => {
+        if (window.electronAPI?.openCourseFile) {
+            const result = await window.electronAPI.openCourseFile();
+            if (!result || result.canceled) return;
+            if (!result.success) {
+                setSaveStatus(`打开失败: ${result.error || '未知错误'}`);
+                setTimeout(() => setSaveStatus(''), 3000);
+                return;
+            }
+
+            const openedContent = result.content || '';
+            setCode(openedContent);
+            setViewMode('code');
+            setCurrentFilePath(result.filePath || '');
+            setCurrentFileName(result.filename || '');
+            runCode(openedContent);
+            setSaveStatus(`已打开: ${result.filename}`);
+            setTimeout(() => setSaveStatus(''), 3000);
+            return;
+        }
+
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleSaveCourse = async () => {
+        if (window.electronAPI?.saveCourseFile) {
+            setSaveStatus('保存中...');
+            const result = await window.electronAPI.saveCourseFile({
+                content: code,
+                filePath: currentFilePath || '',
+                suggestedName: currentFileName || getDefaultFilename(),
+            });
+            if (!result || result.canceled) {
+                setSaveStatus('');
+                return;
+            }
+            if (!result.success) {
+                setSaveStatus(`保存失败: ${result.error || '未知错误'}`);
+                setTimeout(() => setSaveStatus(''), 3000);
+                return;
+            }
+
+            setCurrentFilePath(result.filePath || '');
+            setCurrentFileName(result.filename || '');
+            setSaveStatus(`已保存: ${result.filename}`);
+            setTimeout(() => setSaveStatus(''), 3000);
+            return;
+        }
+
+        await handleExport();
+    };
+
     return (
         <div className="flex h-screen w-full bg-slate-900 text-slate-200 overflow-hidden font-sans">
             
@@ -240,8 +403,11 @@ window.CourseData = {
                         {/* 导出按钮 */}
                         <div className="flex items-center">
                             <span className="text-sm text-green-400 mr-4 font-bold">{saveStatus}</span>
-                            <button onClick={handleExport} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm font-bold flex items-center shadow-md">
-                                <i className="fas fa-download mr-2"></i>导出课件
+                            <button onClick={handleOpenCourse} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm font-bold flex items-center shadow-md mr-2">
+                                <i className="fas fa-folder-open mr-2"></i>打开课件
+                            </button>
+                            <button onClick={handleSaveCourse} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm font-bold flex items-center shadow-md">
+                                <i className="fas fa-floppy-disk mr-2"></i>保存课件
                             </button>
                         </div>
 
@@ -253,18 +419,34 @@ window.CourseData = {
                 {/* 内容区域 */}
                 <div className="flex-1 relative overflow-hidden bg-slate-950">
                     {/* 代码编辑器模式 */}
-                    <div className={`absolute inset-0 transition-opacity duration-300 ${viewMode === 'code' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+                    <div className={`absolute inset-0 transition-opacity duration-300 ${viewMode === 'code' ? 'opacity-100 z-10 flex' : 'opacity-0 z-0 pointer-events-none flex'}`}>
+                        {/* 行号列 */}
+                        <div 
+                            ref={lineNumbersRef}
+                            className="bg-slate-900 text-slate-600 py-6 pr-3 font-mono text-sm text-right select-none overflow-hidden shrink-0 border-r border-slate-800"
+                            style={{ minWidth: '3.5rem', lineHeight: '1.625' }}
+                        >
+                            {lineNumbers.map(n => (
+                                <div key={n}>{n}</div>
+                            ))}
+                        </div>
+                        {/* 编辑器主体 */}
                         <textarea
+                            ref={textareaRef}
                             value={code}
+                            onScroll={handleScroll}
                             onChange={(e) => setCode(e.target.value)}
-                            className="w-full h-full bg-slate-900 text-slate-300 p-6 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500/50 show-scrollbar code-editor leading-relaxed"
+                            className="flex-1 bg-slate-900 text-slate-300 py-6 px-4 font-mono text-sm resize-none focus:outline-none show-scrollbar code-editor border-none outline-none"
                             spellCheck="false"
+                            style={{ whiteSpace: 'pre', overflowX: 'auto', lineHeight: '1.625' }}
                         />
                     </div>
 
                     {/* 实时预览模式 */}
                     <div className={`absolute inset-0 transition-opacity duration-300 ${viewMode === 'preview' ? 'opacity-100 z-10 bg-slate-900' : 'opacity-0 z-0 pointer-events-none'}`}>
-                        {isCompiling ? (
+                        {isAIGenerating ? (
+                            <GeneratingStatus />
+                        ) : isCompiling ? (
                             <SimpleLoading />
                         ) : compileError ? (
                             <ErrorBoundary error={compileError} />
@@ -285,9 +467,18 @@ window.CourseData = {
             <div className="w-96 shrink-0 h-full flex flex-col border-l border-slate-700 bg-slate-800 shadow-xl relative z-20">
                 <AIChat 
                     onCodeGenerated={handleAIGeneratedCode} 
+                    onGeneratingStatusChange={setIsAIGenerating}
                     currentCode={code}
                 />
             </div>
+
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".tsx,.ts,.jsx,.js"
+                className="hidden"
+                onChange={handleImport}
+            />
             
         </div>
     );
