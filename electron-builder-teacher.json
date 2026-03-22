@@ -15,8 +15,6 @@
     "assets/**",
     "public/**",
     "server.js",
-    "course-template.md",
-    "create-course.md",
     "docs/**",
     "node_modules/**",
     "package.json"

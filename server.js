@@ -428,9 +428,9 @@ app.get('/api/student-log', (req, res) => {
     res.json({ log: studentLog });
 });
 
-// 下载 Skill 文件（create-course.md）
+// 下载 Skill 文件（docs/create-course.md）
 app.get('/api/download-skill', (req, res) => {
-    const skillPath = path.join(__dirname, 'create-course.md');
+    const skillPath = path.join(__dirname, 'docs', 'create-course.md');
     if (!fs.existsSync(skillPath)) {
         return res.status(404).send('skill file not found');
     }
@@ -439,9 +439,9 @@ app.get('/api/download-skill', (req, res) => {
     res.sendFile(skillPath);
 });
 
-// 获取课件教程内容（course-template.md）
+// 获取课件教程内容（docs/course-template.md）
 app.get('/api/course-guide', (req, res) => {
-    const guidePath = path.join(__dirname, 'course-template.md');
+    const guidePath = path.join(__dirname, 'docs', 'course-template.md');
     console.log('[api/course-guide] Guide path:', guidePath);
     console.log('[api/course-guide] Exists:', fs.existsSync(guidePath));
 

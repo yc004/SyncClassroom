@@ -120,7 +120,7 @@ window.CourseData = {
 };
 ```
 
-详细模板和 API 参考见 [course-template.md](./course-template.md)，可在教师端控制台点击"课件教程"在线查看，或点击"下载 Skill"获取 AI 辅助生成课件的 Skill 文件。
+详细模板和 API 参考见 [docs/course-template.md](./docs/course-template.md)，可在教师端控制台点击"课件教程"在线查看，或点击"下载 Skill"获取 AI 辅助生成课件的 Skill 文件。
 
 ### 支持的外部库
 
@@ -187,7 +187,11 @@ window.CourseData = {
 │   └── tray-icon.png                  # 应用图标
 ├── electron-builder-teacher.json      # 教师端打包配置
 ├── electron-builder-student.json      # 学生端打包配置
-├── course-template.md                 # 课件开发文档
+├── docs/                              # 文档目录
+│   ├── course-template.md            # 课件开发文档
+│   ├── create-course.md               # 课件创建 Skill
+│   ├── LOGGING.md                     # 日志系统文档
+│   └── LumeSync_参赛全套文档.md       # 参赛文档
 └── .github/workflows/release.yml      # 打 tag 自动发布 Release
 ```
 
