@@ -391,6 +391,7 @@ ipcMain.handle('import-course', async () => {
         filters: [
             { name: '萤火课件文件', extensions: ['lume'] },
             { name: '旧格式课件文件', extensions: ['tsx', 'ts', 'jsx', 'js'] },
+            { name: 'PDF课件', extensions: ['pdf'] },
             { name: '所有文件', extensions: ['*'] },
         ],
         properties: ['openFile', 'multiSelections'],
@@ -402,7 +403,7 @@ ipcMain.handle('import-course', async () => {
     if (!require('fs').existsSync(coursesDir)) {
         require('fs').mkdirSync(coursesDir, { recursive: true });
     }
-    const allowedExts = new Set(['.lume', '.tsx', '.ts', '.jsx', '.js']);
+    const allowedExts = new Set(['.lume', '.tsx', '.ts', '.jsx', '.js', '.pdf']);
     const imported = [];
     const skipped = [];
     for (const srcPath of result.filePaths) {
@@ -413,11 +414,11 @@ ipcMain.handle('import-course', async () => {
         }
 
         const baseName = path.parse(srcPath).name;
-        let destName = ext === '.lume' ? `${baseName}.lume` : `${baseName}.lume`;
+        let destName = ext === '.pdf' ? `${baseName}.pdf` : `${baseName}.lume`;
         let destPath = path.join(coursesDir, destName);
         let n = 1;
         while (require('fs').existsSync(destPath)) {
-            destName = `${baseName}-${n}.lume`;
+            destName = ext === '.pdf' ? `${baseName}-${n}.pdf` : `${baseName}-${n}.lume`;
             destPath = path.join(coursesDir, destName);
             n += 1;
         }
@@ -449,19 +450,20 @@ ipcMain.handle('export-course', async (event, { courseFile } = {}) => {
             return { success: false, error: 'Course file not found' };
         }
 
-        const ensureLumeExt = (p) => {
-            const ext = path.extname(p || '');
-            if (!ext) return `${p}.lume`;
-            if (ext.toLowerCase() !== '.lume') return p.slice(0, -ext.length) + '.lume';
+        const srcExt = (path.extname(requested || '') || '.lume').toLowerCase();
+        const ensureExt = (p, ext) => {
+            const currentExt = path.extname(p || '');
+            if (!currentExt) return `${p}${ext}`;
             return p;
         };
 
-        const suggestedName = ensureLumeExt(path.parse(requested).name);
+        const suggestedName = path.basename(requested);
         const result = await dialog.showSaveDialog(mainWindow, {
             title: '导出课件文件',
             defaultPath: suggestedName,
             filters: [
                 { name: '萤火课件文件', extensions: ['lume'] },
+                { name: 'PDF课件', extensions: ['pdf'] },
                 { name: '所有文件', extensions: ['*'] },
             ],
         });
@@ -470,7 +472,7 @@ ipcMain.handle('export-course', async (event, { courseFile } = {}) => {
             return { success: false, canceled: true };
         }
 
-        const targetPath = ensureLumeExt(result.filePath);
+        const targetPath = ensureExt(result.filePath, srcExt);
         require('fs').copyFileSync(sourcePath, targetPath);
         return { success: true, filePath: targetPath, filename: path.basename(targetPath) };
     } catch (error) {

@@ -36,14 +36,35 @@ function scanCourses() {
     }
     
     const files = fs.readdirSync(coursesDir);
-    const allowedExts = ['.lume', '.tsx', '.ts', '.jsx', '.js'];
-    const extPriority = { '.lume': 5, '.tsx': 4, '.ts': 3, '.jsx': 2, '.js': 1 };
+    const allowedExts = ['.lume', '.tsx', '.ts', '.jsx', '.js', '.pdf'];
+    const extPriority = { '.lume': 5, '.tsx': 4, '.ts': 3, '.jsx': 2, '.js': 1, '.pdf': 0 };
 
     const courses = files
         .filter(f => allowedExts.includes(path.extname(f).toLowerCase()))
         .map(f => {
-            const courseId = f.replace(/\.(lume|tsx|ts|jsx|js)$/i, '');
             const filePath = path.join(coursesDir, f);
+            const ext = path.extname(f).toLowerCase();
+            const courseId = f.replace(/\.(lume|tsx|ts|jsx|js|pdf)$/i, '');
+
+            let mtimeMs = 0;
+            try {
+                mtimeMs = fs.statSync(filePath).mtimeMs || 0;
+            } catch (_) {}
+
+            if (ext === '.pdf') {
+                return {
+                    id: courseId,
+                    file: f,
+                    title: courseId,
+                    icon: '📄',
+                    desc: 'PDF课件',
+                    color: 'from-rose-500 to-orange-600',
+                    type: 'pdf',
+                    _extPriority: extPriority[ext] || 0,
+                    _mtimeMs: mtimeMs
+                };
+            }
+
             let content;
             try {
                 content = fs.readFileSync(filePath, 'utf-8');
@@ -51,11 +72,6 @@ function scanCourses() {
                 console.warn(`[scanCourses] [SKIP] 跳过无法读取的文件: ${f} (${err.message})`);
                 return null;
             }
-
-            let mtimeMs = 0;
-            try {
-                mtimeMs = fs.statSync(filePath).mtimeMs || 0;
-            } catch (_) {}
             
             // 尝试从文件中提取课程元数据
             let title = courseId;
@@ -85,6 +101,7 @@ function scanCourses() {
                 icon,
                 desc,
                 color,
+                type: 'script',
                 _extPriority: extPriority[path.extname(f).toLowerCase()] || 0,
                 _mtimeMs: mtimeMs
             };
@@ -228,6 +245,8 @@ const KNOWN_FILE_URLS = {
     'react-dom.development.js': 'https://unpkg.com/react-dom@18/umd/react-dom.development.js',
     'babel.min.js':             'https://unpkg.com/@babel/standalone/babel.min.js',
     'babel.min.js.map':         'https://unpkg.com/@babel/standalone/babel.min.js.map',
+    'pdf.min.js':               'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+    'pdf.worker.min.js':        'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
     'face-api.min.js':          'https://fastly.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js',
     'katex.min.css':            'https://fastly.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css',
     'KaTeX_AMS-Regular.woff2':            'https://fastly.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_AMS-Regular.woff2',

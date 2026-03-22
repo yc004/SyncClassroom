@@ -139,10 +139,10 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
 
             {/* 顶栏 */}
             <div className="flex items-center justify-between px-6 md:px-8 py-4 bg-white shadow-md z-20 relative h-[72px] shrink-0" style={{WebkitAppRegion:'drag'}}>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <i className="fas fa-microchip text-blue-600 text-2xl md:text-3xl"></i>
-                    <h1 className="text-lg md:text-2xl font-bold text-slate-800 tracking-wide truncate max-w-[200px] md:max-w-none">{title}</h1>
-                    <div className="hidden sm:flex items-center ml-4 space-x-2">
+                    <h1 className="flex-1 min-w-0 text-lg md:text-2xl font-bold text-slate-800 tracking-wide truncate">{title}</h1>
+                    <div className="hidden sm:flex items-center ml-4 space-x-2 shrink-0">
                         <span className={`px-3 py-1 text-xs md:text-sm font-bold rounded-full border ${isHost ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
                             {isHost ? '🧑‍🏫 老师端 (主控)' : '👨‍🎓 学生端 (观看)'}
                         </span>

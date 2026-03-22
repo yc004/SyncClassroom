@@ -1,6 +1,105 @@
 // ========================================================
 // 主应用组件 + 启动入口
 // ========================================================
+const ensurePdfJsLoaded = async () => {
+    if (window.pdfjsLib && typeof window.pdfjsLib.getDocument === 'function') return true;
+    const ok = await loadScriptWithFallback(
+        '/lib/pdf.min.js',
+        'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
+    );
+    if (!ok || !window.pdfjsLib) return false;
+    try {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/lib/pdf.worker.min.js';
+    } catch (_) {}
+    return true;
+};
+
+const getPdfDoc = (pdfUrl) => {
+    if (!window.__LumeSyncPdfDocCache) window.__LumeSyncPdfDocCache = new Map();
+    const cache = window.__LumeSyncPdfDocCache;
+    const key = String(pdfUrl || '');
+    if (!key) return Promise.reject(new Error('Missing pdfUrl'));
+    const existing = cache.get(key);
+    if (existing) return existing;
+    const p = window.pdfjsLib.getDocument({ url: key }).promise;
+    cache.set(key, p);
+    return p;
+};
+
+function PdfPageSlide({ pdfUrl, pageNumber }) {
+    const canvasRef = useRef(null);
+    const [status, setStatus] = useState('loading');
+
+    useEffect(() => {
+        let cancelled = false;
+
+        (async () => {
+            try {
+                setStatus('loading');
+                const doc = await getPdfDoc(pdfUrl);
+                const page = await doc.getPage(pageNumber);
+                if (cancelled) return;
+
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d', { alpha: false });
+                if (!ctx) throw new Error('Canvas context not available');
+
+                const padding = 24;
+                const maxW = 1280 - padding * 2;
+                const maxH = 720 - padding * 2;
+
+                const baseViewport = page.getViewport({ scale: 1 });
+                const scale = Math.max(0.1, Math.min(maxW / baseViewport.width, maxH / baseViewport.height));
+                const viewport = page.getViewport({ scale });
+
+                const outputScale = window.devicePixelRatio || 1;
+                canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
+                canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+                canvas.style.width = Math.floor(viewport.width) + 'px';
+                canvas.style.height = Math.floor(viewport.height) + 'px';
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                if (outputScale !== 1) ctx.scale(outputScale, outputScale);
+
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                if (cancelled) return;
+                setStatus('done');
+            } catch (err) {
+                if (cancelled) return;
+                console.error('[PDF] render failed:', err);
+                setStatus('error');
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [pdfUrl, pageNumber]);
+
+    return (
+        <div className="w-full h-full bg-slate-50 flex items-center justify-center relative">
+            <canvas ref={canvasRef} className="bg-white rounded-xl shadow-xl" />
+            {status === 'loading' && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="px-4 py-2 rounded-xl bg-white/90 border border-slate-200 text-slate-600 font-bold">
+                        正在渲染 PDF...
+                    </div>
+                </div>
+            )}
+            {status === 'error' && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold">
+                        PDF 渲染失败
+                    </div>
+                </div>
+            )}
+            <div className="absolute bottom-4 right-4 px-2 py-1 rounded-lg bg-white/90 border border-slate-200 text-slate-600 text-xs font-bold">
+                {pageNumber}
+            </div>
+        </div>
+    );
+}
+
 function ClassroomApp() {
     const [isHost, setIsHost] = useState(false);
     const [roleAssigned, setRoleAssigned] = useState(false);
@@ -148,6 +247,77 @@ function ClassroomApp() {
 
         setIsLoading(true);
         setCourseError(null);
+
+        const courseFileLower = String(course.file || '').toLowerCase();
+        if (courseFileLower.endsWith('.pdf')) {
+            try {
+                setLoadingProgress({
+                    currentStep: '正在初始化 PDF 播放器',
+                    currentFile: 'pdf.js',
+                    progress: 10,
+                    totalSteps: 3,
+                    currentStepIndex: 1
+                });
+
+                const ok = await ensurePdfJsLoaded();
+                if (!ok) throw new Error('PDF 渲染库加载失败');
+
+                const pdfUrl = `/courses/${course.file}`;
+                setLoadingProgress({
+                    currentStep: '正在解析 PDF 页数',
+                    currentFile: course.file,
+                    progress: 50,
+                    totalSteps: 3,
+                    currentStepIndex: 2
+                });
+
+                const doc = await getPdfDoc(pdfUrl);
+                const pageCount = Math.max(1, Number(doc.numPages || 1));
+                const slides = Array.from({ length: pageCount }, (_, idx) => ({
+                    id: `page-${idx + 1}`,
+                    component: <PdfPageSlide pdfUrl={pdfUrl} pageNumber={idx + 1} />
+                }));
+
+                window.CourseGlobalContext = {
+                    canvas: window.__LumeSyncCanvas,
+                    getCamera: (onStream) => {
+                        if (window._onCamActive) {
+                            window._onCamActive(true);
+                        } else {
+                            setTimeout(() => {
+                                if (window._onCamActive) window._onCamActive(true);
+                            }, 0);
+                        }
+                        return window.CameraManager.getStream(onStream);
+                    },
+                    releaseCamera: () => window.CameraManager.release(),
+                    unregisterCamera: (onStream) => window.CameraManager.unregister(onStream),
+                };
+
+                setCurrentCourseData({
+                    id: course.id,
+                    title: course.title || course.id,
+                    icon: course.icon || '📄',
+                    desc: course.desc || 'PDF课件',
+                    color: course.color || 'from-rose-500 to-orange-600',
+                    slides
+                });
+
+                setLoadingProgress({
+                    currentStep: '加载完成',
+                    currentFile: '',
+                    progress: 100,
+                    totalSteps: 3,
+                    currentStepIndex: 3
+                });
+            } catch (err) {
+                console.error('[ClassroomApp] load pdf failed:', err);
+                setCourseError(err);
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
 
         // 计算总步骤数
         let totalSteps = 3; // 基础步骤：获取课程、编译、执行

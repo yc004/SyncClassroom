@@ -139,6 +139,183 @@ function ErrorBoundary({ error, onAutoFix }) {
     );
 }
 
+function PdfPreview({ pdfData, filename, uiScale = 1.0 }) {
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageCount, setPageCount] = useState(1);
+    const [status, setStatus] = useState('loading'); // loading | ready | error
+    const stageWrapRef = useRef(null);
+    const [stageScale, setStageScale] = useState(1);
+    const canvasRef = useRef(null);
+    const pdfDocRef = useRef(null);
+    const renderTokenRef = useRef(0);
+
+    useEffect(() => {
+        const updateScale = () => {
+            if (!stageWrapRef.current) return;
+            const availableWidth = stageWrapRef.current.clientWidth - 24;
+            const availableHeight = stageWrapRef.current.clientHeight - 24;
+            const baseWidth = 1280;
+            const baseHeight = 720;
+            const scaleW = availableWidth / baseWidth;
+            const scaleH = availableHeight / baseHeight;
+            const nextScale = Math.max(Math.min(scaleW, scaleH, 0.96), 0.1);
+            setStageScale(nextScale);
+        };
+
+        const resizeObserver = new ResizeObserver(updateScale);
+        if (stageWrapRef.current) resizeObserver.observe(stageWrapRef.current);
+        updateScale();
+
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const token = ++renderTokenRef.current;
+
+        (async () => {
+            try {
+                setStatus('loading');
+                pdfDocRef.current = null;
+
+                const task = window.pdfjsLib.getDocument({ data: pdfData });
+                const doc = await task.promise;
+                if (cancelled || token !== renderTokenRef.current) return;
+
+                pdfDocRef.current = doc;
+                setPageCount(Math.max(1, Number(doc.numPages || 1)));
+                setCurrentPage(1);
+                setStatus('ready');
+            } catch (err) {
+                if (cancelled) return;
+                console.error('[EditorPDF] load failed:', err);
+                setStatus('error');
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [pdfData]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const token = ++renderTokenRef.current;
+
+        (async () => {
+            try {
+                if (!pdfDocRef.current) return;
+                setStatus('loading');
+
+                const doc = pdfDocRef.current;
+                const page = await doc.getPage(currentPage);
+                if (cancelled || token !== renderTokenRef.current) return;
+
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d', { alpha: false });
+                if (!ctx) throw new Error('Canvas context not available');
+
+                const padding = 24;
+                const maxW = 1280 - padding * 2;
+                const maxH = 720 - padding * 2;
+
+                const baseViewport = page.getViewport({ scale: 1 });
+                const fitScale = Math.max(0.1, Math.min(maxW / baseViewport.width, maxH / baseViewport.height));
+                const viewport = page.getViewport({ scale: fitScale });
+
+                const outputScale = window.devicePixelRatio || 1;
+                canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
+                canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+                canvas.style.width = Math.floor(viewport.width) + 'px';
+                canvas.style.height = Math.floor(viewport.height) + 'px';
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                if (outputScale !== 1) ctx.scale(outputScale, outputScale);
+
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                if (cancelled || token !== renderTokenRef.current) return;
+
+                setStatus('ready');
+            } catch (err) {
+                if (cancelled) return;
+                console.error('[EditorPDF] render failed:', err);
+                setStatus('error');
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [currentPage, pageCount]);
+
+    const prevPage = () => setCurrentPage(p => Math.max(1, p - 1));
+    const nextPage = () => setCurrentPage(p => Math.min(pageCount, p + 1));
+
+    return (
+        <div className="flex flex-col h-full bg-slate-900">
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 shrink-0">
+                <div className="flex items-center space-x-3 min-w-0">
+                    <i className="fas fa-file-pdf text-rose-400 text-xl"></i>
+                    <h1 className="text-lg font-bold text-white truncate">{filename || 'PDF预览'}</h1>
+                </div>
+                <div className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
+                    {currentPage} / {pageCount}
+                </div>
+            </div>
+
+            <div className="flex-1 relative flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden">
+                <div ref={stageWrapRef} className="w-full h-full flex items-center justify-center overflow-hidden">
+                    <div
+                        className="bg-white text-slate-800 relative shadow-2xl flex flex-col rounded-xl overflow-hidden shrink-0"
+                        style={{
+                            width: '1280px',
+                            height: '720px',
+                            transform: `scale(${stageScale * uiScale})`,
+                            transformOrigin: 'center center',
+                            transition: 'transform 0.2s ease-out'
+                        }}
+                    >
+                        <div className="w-full h-full bg-slate-50 flex items-center justify-center relative">
+                            <canvas ref={canvasRef} className="bg-white rounded-xl shadow-xl" />
+                            {status === 'loading' && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="px-4 py-2 rounded-xl bg-white/90 border border-slate-200 text-slate-600 font-bold">
+                                        正在渲染 PDF...
+                                    </div>
+                                </div>
+                            )}
+                            {status === 'error' && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold">
+                                        PDF 渲染失败
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 px-6 py-4 bg-slate-800 border-t border-slate-700 shrink-0">
+                <button
+                    onClick={prevPage}
+                    disabled={currentPage === 1}
+                    className={`flex items-center px-4 py-2 rounded-lg font-bold transition-all ${currentPage === 1 ? 'text-slate-500 bg-slate-700 cursor-not-allowed' : 'text-white bg-blue-600 hover:bg-blue-500'}`}
+                >
+                    <i className="fas fa-chevron-left mr-2"></i>上一页
+                </button>
+                <span className="text-slate-400 font-bold bg-slate-700 px-4 py-2 rounded-lg">
+                    {currentPage} / {pageCount}
+                </span>
+                <button
+                    onClick={nextPage}
+                    disabled={currentPage === pageCount}
+                    className={`flex items-center px-4 py-2 rounded-lg font-bold transition-all ${currentPage === pageCount ? 'text-slate-500 bg-slate-700 cursor-not-allowed' : 'text-white bg-blue-600 hover:bg-blue-500'}`}
+                >
+                    下一页<i className="fas fa-chevron-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    );
+}
+
 // 正在生成状态组件（带计时器）
 function GeneratingStatus() {
     const [seconds, setSeconds] = useState(0);
@@ -199,6 +376,7 @@ window.CourseData = {
     const [uiScale, setUiScale] = useState(1.0);
     const [renderScale, setRenderScale] = useState(0.96);
     const [showScalePanel, setShowScalePanel] = useState(false);
+    const [pdfPreview, setPdfPreview] = useState(null); // { filename: string, data: Uint8Array }
     const fileInputRef = useRef(null);
     const textareaRef = useRef(null);
     const lineNumbersRef = useRef(null);
@@ -373,6 +551,19 @@ window.CourseData = {
         }
     };
 
+    const ensurePdfJsLoaded = async () => {
+        if (window.pdfjsLib && typeof window.pdfjsLib.getDocument === 'function') return true;
+        const ok = await loadScriptWithFallback(
+            '/lib/pdf.min.js',
+            'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
+        );
+        if (!ok || !window.pdfjsLib) return false;
+        try {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/lib/pdf.worker.min.js';
+        } catch (_) {}
+        return true;
+    };
+
     const runCode = async (sourceCode) => {
         const token = ++compileTokenRef.current;
         setIsCompiling(true);
@@ -412,6 +603,7 @@ window.CourseData = {
     useEffect(() => {
         // AI 正在生成时暂停自动编译，避免由于代码不完整导致的语法错误提示
         if (isAIGenerating) return;
+        if (pdfPreview) return;
 
         // 使用防抖避免频繁编译
         const timer = setTimeout(() => {
@@ -420,9 +612,13 @@ window.CourseData = {
             }
         }, 800);
         return () => clearTimeout(timer);
-    }, [code, viewMode, isAIGenerating]);
+    }, [code, viewMode, isAIGenerating, pdfPreview]);
 
     const handleAIGeneratedCode = (newCode) => {
+        if (pdfPreview) {
+            showToast('PDF 仅支持预览，无法生成或修改代码', 'error');
+            return;
+        }
         setCode(newCode);
         // 不再强制跳转到预览视图，保持用户当前的视图模式 (预览或源码)
         // setViewMode('preview');
@@ -438,9 +634,40 @@ window.CourseData = {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
 
+        const ext = String(file.name || '').split('.').pop()?.toLowerCase() || '';
+        if (ext === 'pdf') {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const ok = await ensurePdfJsLoaded();
+                    if (!ok) {
+                        showToast('PDF 渲染库加载失败', 'error');
+                        return;
+                    }
+
+                    const buf = e.target.result;
+                    const data = new Uint8Array(buf);
+                    setPdfPreview({ filename: file.name, data });
+                    setViewMode('preview');
+                    setCurrentFilePath('');
+                    setCurrentFileName(file.name);
+                    setCompiledCourseData(null);
+                    setCompileError(null);
+                    showToast(`已导入 PDF(仅预览): ${file.name}`, 'success');
+                } catch (err) {
+                    console.error('[EditorPDF] import failed:', err);
+                    showToast('PDF 导入失败', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            event.target.value = '';
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = (e) => {
             const content = e.target.result;
+            setPdfPreview(null);
             setCode(content);
             setViewMode('code');
             setCurrentFilePath('');
@@ -454,6 +681,10 @@ window.CourseData = {
     };
 
     const handleExport = async () => {
+        if (pdfPreview) {
+            showToast('PDF 仅支持预览，无法导出修改', 'error');
+            return;
+        }
         // 尝试从代码中提取 id 作为文件名
         let defaultFilename = 'untitled.lume';
         const idMatch = code.match(/id:\s*['"]([^'"]+)['"]/);
@@ -491,7 +722,35 @@ window.CourseData = {
                 return;
             }
 
+            if (result.kind === 'pdf' && result.encoding === 'base64') {
+                try {
+                    const ok = await ensurePdfJsLoaded();
+                    if (!ok) {
+                        showToast('PDF 渲染库加载失败', 'error');
+                        return;
+                    }
+
+                    const raw = atob(result.content || '');
+                    const bytes = new Uint8Array(raw.length);
+                    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+                    setPdfPreview({ filename: result.filename || 'PDF预览', data: bytes });
+                    setViewMode('preview');
+                    setCurrentFilePath(result.filePath || '');
+                    setCurrentFileName(result.filename || '');
+                    setCompiledCourseData(null);
+                    setCompileError(null);
+                    showToast(`已打开 PDF(仅预览): ${result.filename}`, 'success');
+                    return;
+                } catch (err) {
+                    console.error('[EditorPDF] open failed:', err);
+                    showToast('打开 PDF 失败', 'error');
+                    return;
+                }
+            }
+
             const openedContent = result.content || '';
+            setPdfPreview(null);
             setCode(openedContent);
             setViewMode('code');
             setCurrentFilePath(result.filePath || '');
@@ -507,6 +766,10 @@ window.CourseData = {
     };
 
     const handleSaveCourse = async () => {
+        if (pdfPreview) {
+            showToast('PDF 仅支持预览，无法保存修改', 'error');
+            return;
+        }
         if (window.electronAPI?.saveCourseFile) {
             setIsSaving(true);
             try {
@@ -556,11 +819,16 @@ window.CourseData = {
                                 onClick={() => setViewMode('preview')}
                                 className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors flex items-center ${viewMode === 'preview' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
                             >
-                                <i className="fas fa-eye mr-2"></i> 实时预览
+                                <i className={`fas ${pdfPreview ? 'fa-file-pdf' : 'fa-eye'} mr-2`}></i> {pdfPreview ? 'PDF预览' : '实时预览'}
                             </button>
                             <button 
                                 onClick={() => setViewMode('code')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors flex items-center ${viewMode === 'code' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                                disabled={!!pdfPreview}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors flex items-center ${
+                                    pdfPreview
+                                        ? 'text-slate-600 cursor-not-allowed'
+                                        : (viewMode === 'code' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200')
+                                }`}
                             >
                                 <i className="fas fa-code mr-2"></i> 源码编辑
                             </button>
@@ -665,13 +933,13 @@ window.CourseData = {
                             </button>
                             <button
                                 onClick={handleSaveCourse}
-                                disabled={isSaving}
+                                disabled={isSaving || !!pdfPreview}
                                 className={`px-4 py-2 rounded-lg transition-colors text-sm font-bold flex items-center shadow-md ${
-                                    isSaving ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'
+                                    (isSaving || pdfPreview) ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'
                                 }`}
                             >
                                 <i className={`fas ${isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'} mr-2`}></i>
-                                {isSaving ? '保存中...' : '保存课件'}
+                                {isSaving ? '保存中...' : (pdfPreview ? '仅预览' : '保存课件')}
                             </button>
                         </div>
 
@@ -724,7 +992,9 @@ window.CourseData = {
 
                     {/* 实时预览模式 */}
                     <div className={`absolute inset-0 transition-opacity duration-300 ${viewMode === 'preview' ? 'opacity-100 z-10 bg-slate-900' : 'opacity-0 z-0 pointer-events-none'}`}>
-                        {isAIGenerating ? (
+                        {pdfPreview ? (
+                            <PdfPreview pdfData={pdfPreview.data} filename={pdfPreview.filename} uiScale={clampedUiScale} />
+                        ) : isAIGenerating ? (
                             <GeneratingStatus />
                         ) : isCompiling ? (
                             <SimpleLoading />
@@ -754,12 +1024,22 @@ window.CourseData = {
                     currentCode={code}
                     compileError={compileError}
                 />
+                {pdfPreview && (
+                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6">
+                        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 text-center shadow-2xl">
+                            <div className="text-slate-100 font-bold text-lg mb-2">PDF 仅支持预览</div>
+                            <div className="text-slate-400 text-sm leading-relaxed">
+                                当前打开的是 PDF 文件，编辑器不允许修改内容，也不会进行 AI 生成。
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <input
                 ref={fileInputRef}
                 type="file"
-                accept=".lume,.tsx,.ts,.jsx,.js"
+                accept=".lume,.tsx,.ts,.jsx,.js,.pdf"
                 className="hidden"
                 onChange={handleImport}
             />

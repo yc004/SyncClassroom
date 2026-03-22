@@ -458,6 +458,7 @@ ipcMain.handle('open-course-file', async () => {
             filters: [
                 { name: '萤火课件文件', extensions: ['lume'] },
                 { name: '旧格式课件文件', extensions: ['tsx', 'ts', 'jsx', 'js'] },
+                { name: 'PDF课件', extensions: ['pdf'] },
                 { name: '所有文件', extensions: ['*'] },
             ],
         });
@@ -467,11 +468,25 @@ ipcMain.handle('open-course-file', async () => {
         }
 
         const filePath = result.filePaths[0];
+        const ext = path.extname(filePath || '').toLowerCase();
+        if (ext === '.pdf') {
+            const buf = fs.readFileSync(filePath);
+            return {
+                success: true,
+                filePath,
+                filename: path.basename(filePath),
+                kind: 'pdf',
+                encoding: 'base64',
+                content: buf.toString('base64'),
+            };
+        }
+
         const content = fs.readFileSync(filePath, 'utf-8');
         return {
             success: true,
             filePath,
             filename: path.basename(filePath),
+            kind: 'text',
             content,
         };
     } catch (error) {
