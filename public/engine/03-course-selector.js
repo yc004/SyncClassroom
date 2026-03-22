@@ -7,6 +7,8 @@ function CourseSelector({ courses, currentCourseId, onSelectCourse, onRefresh, s
     const [guideContent, setGuideContent] = useState('');
     const [showSettings, setShowSettings] = useState(false);
     const [showClassroomView, setShowClassroomView] = useState(false);
+    const [showCourseManager, setShowCourseManager] = useState(false);
+    const [courseList, setCourseList] = useState(courses);
 
     const handleSelect = (courseId) => { setSelectedId(courseId); };
 
@@ -40,6 +42,28 @@ function CourseSelector({ courses, currentCourseId, onSelectCourse, onRefresh, s
         setShowGuide(true);
     };
 
+    const handleDeleteCourse = async (courseId) => {
+        if (!confirm(`确定要删除课程 "${courseId}" 吗？此操作不可恢复！`)) {
+            return;
+        }
+        try {
+            const res = await fetch('/api/delete-course', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ courseId })
+            });
+            const result = await res.json();
+            if (result.success) {
+                onRefresh();
+                setCourseList(result.courses);
+            } else {
+                alert('删除失败：' + (result.error || '未知错误'));
+            }
+        } catch (err) {
+            alert('删除失败：网络错误');
+        }
+    };
+
     return (
         <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
             <div className="flex items-center justify-between px-8 py-5 bg-slate-800 border-b border-slate-700" style={{WebkitAppRegion:'drag'}}>
@@ -69,6 +93,7 @@ function CourseSelector({ courses, currentCourseId, onSelectCourse, onRefresh, s
                     <span className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full text-sm font-bold border border-blue-500/30">
                         老师端 (主控)
                     </span>
+                    <WindowControls />
                 </div>
             </div>
 
@@ -85,6 +110,9 @@ function CourseSelector({ courses, currentCourseId, onSelectCourse, onRefresh, s
                                 <i className="fas fa-file-import mr-2"></i> 导入课程
                             </button>
                         )}
+                        <button onClick={() => { setCourseList(courses); setShowCourseManager(true); }} className="flex items-center px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors text-sm font-medium" title="管理课件">
+                            <i className="fas fa-cog mr-2"></i> 课件管理
+                        </button>
                         <button onClick={onRefresh} className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm">
                             <i className="fas fa-sync-alt mr-2"></i> 刷新课程列表
                         </button>
@@ -181,6 +209,58 @@ function CourseSelector({ courses, currentCourseId, onSelectCourse, onRefresh, s
 
             {showClassroomView && (
                 <ClassroomView onClose={() => setShowClassroomView(false)} socket={socket} studentLog={studentLog} />
+            )}
+
+            {showCourseManager && (
+                <div className="fixed inset-0 z-50 flex" onClick={() => setShowCourseManager(false)}>
+                    <div className="ml-auto w-full max-w-2xl h-full bg-slate-900 shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 shrink-0">
+                            <h3 className="text-white font-bold text-lg flex items-center">
+                                <i className="fas fa-cog mr-2 text-amber-400"></i>课件管理
+                            </h3>
+                            <button onClick={() => setShowCourseManager(false)} className="text-slate-400 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-700 transition-colors">
+                                <i className="fas fa-xmark text-xl"></i>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="mb-4 text-slate-400 text-sm">共 {courseList.length} 个课件</div>
+                            <div className="space-y-3">
+                                {courseList.map(course => (
+                                    <div key={course.id} className="flex items-center justify-between p-4 bg-slate-800 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors">
+                                        <div className="flex items-center space-x-4">
+                                            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${course.color} flex items-center justify-center text-xl shrink-0`}>
+                                                {course.icon}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-white font-bold truncate">{course.title}</h4>
+                                                <p className="text-slate-500 text-xs mt-1 font-mono truncate">{course.file}</p>
+                                                {course.desc && (
+                                                    <p className="text-slate-400 text-xs mt-1 truncate">{course.desc}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleDeleteCourse(course.id)}
+                                            className="flex items-center px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors text-sm font-medium"
+                                            title="删除此课件"
+                                        >
+                                            <i className="fas fa-trash mr-1.5"></i>删除
+                                        </button>
+                                    </div>
+                                ))}
+                                {courseList.length === 0 && (
+                                    <div className="text-center py-12 bg-slate-800/50 rounded-xl border border-slate-700">
+                                        <i className="fas fa-folder-open text-4xl text-slate-600 mb-3"></i>
+                                        <p className="text-slate-500 text-sm">暂无课件</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-800 border-t border-slate-700">
+                            <p className="text-slate-500 text-xs text-center">删除课件将从服务器移除对应文件，此操作不可恢复</p>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

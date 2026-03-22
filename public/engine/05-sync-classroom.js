@@ -174,6 +174,12 @@ function SyncClassroom({ title, slides, onEndCourse, socket, isHost: initialIsHo
                     >
                         <i className="fas fa-expand text-lg md:text-xl"></i>
                     </button>
+                    {!isHost && (
+                        <WindowControls forceFullscreen={settings.forceFullscreen} />
+                    )}
+                    {isHost && (
+                        <WindowControls />
+                    )}
                 </div>
             </div>
 

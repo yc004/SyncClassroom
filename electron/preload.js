@@ -34,4 +34,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setAutostart: (enable) => ipcRenderer.invoke('set-autostart', enable),
     // 教师端：打开日志目录
     openLogDir: () => ipcRenderer.invoke('open-log-dir'),
+    // 窗口控制：最小化、最大化/还原、关闭
+    minimizeWindow: () => ipcRenderer.send('minimize-window'),
+    maximizeWindow: () => ipcRenderer.send('maximize-window'),
+    closeWindow: () => ipcRenderer.send('close-window'),
+    // 窗口状态监听
+    onWindowMaximized: (callback) => ipcRenderer.on('window-maximized', callback),
+    onWindowUnmaximized: (callback) => ipcRenderer.on('window-unmaximized', callback),
+    removeWindowMaximizedListener: (callback) => ipcRenderer.removeListener('window-maximized', callback),
+    removeWindowUnmaximizedListener: (callback) => ipcRenderer.removeListener('window-unmaximized', callback),
+    // AI 课件编辑器功能
+    getAIConfig: () => ipcRenderer.invoke('get-ai-config'),
+    saveAIConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
+    saveCourse: (data) => ipcRenderer.invoke('save-course', data),
 });

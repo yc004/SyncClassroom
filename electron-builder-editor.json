@@ -1,0 +1,40 @@
+{
+  "appId": "com.lumesync.editor",
+  "productName": "LumeSync Editor",
+  "copyright": "Copyright © 2024",
+  "directories": {
+    "output": "dist/editor",
+    "buildResources": "build"
+  },
+  "files": [
+    "electron/main-editor.js",
+    "electron/preload.js",
+    "assets/**",
+    "public/**",
+    "node_modules/**",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "electron/main-editor.js"
+  },
+  "asar": false,
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "requestedExecutionLevel": "asInvoker"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": false,
+    "installerLanguages": ["zh_CN"],
+    "language": "2052",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "LumeSync Editor"
+  }
+}

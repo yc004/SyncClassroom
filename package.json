@@ -7,10 +7,12 @@
     "start": "node server.js",
     "start:teacher": "electron electron/main-teacher.js",
     "start:student": "electron electron/main-student.js",
+    "start:editor": "electron electron/main-editor.js",
     "build:verify": "pkg build/verify-password.js --target node18-win-x64 --output build/verify-password.exe",
     "build:teacher": "electron-builder --config electron-builder-teacher.json",
     "build:student": "npm run build:verify && electron-builder --config electron-builder-student.json",
-    "build:all": "npm run build:teacher && npm run build:student",
+    "build:editor": "electron-builder --config electron-builder-editor.json",
+    "build:all": "npm run build:teacher && npm run build:student && npm run build:editor",
     "build:icons": "python build/convert-icons.py"
   },
   "dependencies": {

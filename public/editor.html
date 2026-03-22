@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>萤火课件编辑器</title>
+
+    <!-- Tailwind CSS -->
+    <script src="lib/tailwindcss.js" onerror="this.src='https://cdn.tailwindcss.com'"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="lib/fontawesome.all.min.css" onerror="this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'">
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="lib/react.development.js" onerror="this.src='https://unpkg.com/react@18/umd/react.development.js'"></script>
+    <script crossorigin src="lib/react-dom.development.js" onerror="this.src='https://unpkg.com/react-dom@18/umd/react-dom.development.js'"></script>
+    
+    <!-- Babel -->
+    <script src="lib/babel.min.js" onerror="this.src='https://unpkg.com/@babel/standalone/babel.min.js'"></script>
+    
+    <!-- marked -->
+    <script src="lib/marked.min.js" onerror="this.src='https://fastly.jsdelivr.net/npm/marked@9/marked.min.js'"></script>
+
+    <!-- Monaco Editor (可选，如果以后想加高级代码编辑。这里我们先用普通 textarea，保证不依赖复杂外网资源) -->
+
+    <style>
+        * { scrollbar-width: none; -ms-overflow-style: none; user-select: none; -webkit-user-select: none; }
+        *::-webkit-scrollbar { display: none; }
+        .markdown-body { color: #334155; line-height: 1.7; }
+        .markdown-body pre { background: #1e293b; border-radius: 8px; padding: 1em; overflow-x: auto; margin: 0.8em 0; }
+        .markdown-body code { font-family: 'Consolas', monospace; font-size: 0.85em; }
+        .code-editor { font-family: 'Consolas', monospace; user-select: text; -webkit-user-select: text; tab-size: 4; }
+        .chat-selectable { user-select: text; -webkit-user-select: text; }
+        
+        /* 编辑器和预览需要滚动条 */
+        .show-scrollbar::-webkit-scrollbar { display: block; width: 8px; height: 8px; }
+        .show-scrollbar::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 4px; }
+        .show-scrollbar { scrollbar-width: auto; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white">
+    <div id="root"></div>
+
+    <!-- 窗口控制组件 (复用) -->
+    <script type="text/babel" src="components/WindowControls.js"></script>
+
+    <!-- 模拟 Socket.io 用于编辑器内联预览 -->
+    <script>
+        // 提供一个假的 socket.io 环境
+        window.io = function() {
+            return {
+                on: () => {},
+                emit: () => {},
+                off: () => {},
+                disconnect: () => {},
+                connected: true
+            };
+        };
+        // 提供假的 electronAPI 等给预览组件
+        if (!window.electronAPI) {
+            window.electronAPI = {};
+        }
+        // 提供基本的 CourseGlobalContext，确保课件兼容性
+        window.CourseGlobalContext = {
+            modelUrl: '',
+            getCamera: (onStream) => {
+                console.warn('[Editor] 摄像头功能在编辑器中不可用');
+                if (onStream) onStream(null);
+                return Promise.resolve(null);
+            },
+            releaseCamera: () => {},
+            unregisterCamera: () => {}
+        };
+        // 提供基本的 CameraManager
+        window.CameraManager = {
+            getStream: () => Promise.resolve(null),
+            release: () => {},
+            unregister: () => {},
+            isActive: () => false,
+            getDevices: () => [],
+            getCurrentDeviceId: () => null,
+            switchDevice: () => Promise.resolve()
+        };
+    </script>
+
+    <!-- 编辑器所需组件 -->
+    <script type="text/babel" src="engine/00-globals.js"></script>
+    <!-- 不再需要 SyncClassroom，使用简化的预览组件 -->
+    <script type="text/babel" src="editor/01-ai-chat.js"></script>
+    <script type="text/babel" src="editor/02-editor-app.js"></script>
+</body>
+</html>

@@ -313,7 +313,10 @@ app.use('/lib/:fileName', (req, res) => {
 // （FontAwesome CSS 中字体路径是相对路径 ../webfonts/，浏览器解析后变成 /webfonts/）
 app.use('/webfonts/:fileName', (req, res) => {
     const fileName = req.params.fileName;
-    const localPath = path.join(libDir, fileName);
+    const webfontsDir = path.join(__dirname, 'public', 'webfonts');
+    if (!fs.existsSync(webfontsDir)) fs.mkdirSync(webfontsDir, { recursive: true });
+    
+    const localPath = path.join(webfontsDir, fileName);
     if (fs.existsSync(localPath)) {
         return res.sendFile(localPath);
     }
@@ -415,6 +418,33 @@ app.get('/api/course-status', (req, res) => {
 app.post('/api/refresh-courses', (req, res) => {
     courseCatalog = scanCourses();
     res.json({ success: true, courses: courseCatalog });
+});
+
+// 删除指定课件
+app.delete('/api/delete-course', (req, res) => {
+    const { courseId } = req.body;
+    if (!courseId) {
+        return res.status(400).json({ success: false, error: '缺少 courseId 参数' });
+    }
+    
+    const course = courseCatalog.find(c => c.id === courseId);
+    if (!course) {
+        return res.status(404).json({ success: false, error: '课件不存在' });
+    }
+    
+    const filePath = path.join(coursesDir, course.file);
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`[delete-course] deleted: ${course.file}`);
+        }
+        // 更新课程目录
+        courseCatalog = scanCourses();
+        res.json({ success: true, courses: courseCatalog });
+    } catch (err) {
+        console.error(`[delete-course] error:`, err);
+        res.status(500).json({ success: false, error: '删除文件失败' });
+    }
 });
 
 // 获取当前在线学生列表

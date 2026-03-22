@@ -338,7 +338,7 @@ function ClassroomApp() {
     }
 
     if (!isHost && !currentCourseId) {
-        return <StudentWaitingRoom />;
+        return <StudentWaitingRoom forceFullscreen={settings.forceFullscreen} />;
     }
 
     if (isLoading) {

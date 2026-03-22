@@ -64,7 +64,13 @@ if (!fs.existsSync(libDir)) {
 // 下载单个资源（支持重定向）
 function downloadResource(resource, redirectUrl = null, redirectCount = 0) {
     return new Promise((resolve, reject) => {
-        const filePath = path.join(libDir, resource.filename);
+        const targetDir = resource.filename.startsWith('fa-') ? path.join(__dirname, 'public', 'webfonts') : libDir;
+        
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        
+        const filePath = path.join(targetDir, resource.filename);
         const MAX_REDIRECTS = 5;
         
         if (redirectCount > MAX_REDIRECTS) {

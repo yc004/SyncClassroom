@@ -247,6 +247,14 @@ function createMainWindow() {
             event.preventDefault();
         }
     });
+
+    // 窗口最大化/还原事件（通知渲染进程）
+    mainWindow.on('maximize', () => {
+        mainWindow.webContents.send('window-maximized');
+    });
+    mainWindow.on('unmaximize', () => {
+        mainWindow.webContents.send('window-unmaximized');
+    });
 }
 
 // ── 课堂开始：按设置决定是否全屏置顶 ───────────────────
@@ -459,6 +467,29 @@ ipcMain.on('manual-retry', () => {
             startRetrying();
         });
     }
+});
+
+// IPC: 窗口控制
+ipcMain.on('minimize-window', () => {
+    if (!mainWindow) return;
+    mainWindow.minimize();
+});
+
+ipcMain.on('maximize-window', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+    } else {
+        mainWindow.maximize();
+    }
+});
+
+ipcMain.on('close-window', () => {
+    if (!mainWindow) return;
+    if (isClassActive) {
+        return;
+    }
+    mainWindow.close();
 });
 
 // ── 应用生命周期 ─────────────────────────────────────────

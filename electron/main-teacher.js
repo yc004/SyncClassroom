@@ -180,6 +180,14 @@ function createWindow() {
         logger.info('WINDOW', 'Window closed');
         mainWindow = null;
     });
+
+    // 窗口最大化/还原事件（通知渲染进程）
+    mainWindow.on('maximize', () => {
+        mainWindow.webContents.send('window-maximized');
+    });
+    mainWindow.on('unmaximize', () => {
+        mainWindow.webContents.send('window-unmaximized');
+    });
 }
 
 // ── 系统托盘 ────────────────────────────────────────────
@@ -257,6 +265,26 @@ ipcMain.handle('open-log-dir', () => {
 ipcMain.on('toggle-fullscreen', () => {
     if (!mainWindow) return;
     mainWindow.setFullScreen(!mainWindow.isFullScreen());
+});
+
+// IPC: 窗口控制
+ipcMain.on('minimize-window', () => {
+    if (!mainWindow) return;
+    mainWindow.minimize();
+});
+
+ipcMain.on('maximize-window', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+    } else {
+        mainWindow.maximize();
+    }
+});
+
+ipcMain.on('close-window', () => {
+    if (!mainWindow) return;
+    mainWindow.close();
 });
 
 // IPC: 导入课程文件（弹出文件选择对话框，复制到 public/courses/）
