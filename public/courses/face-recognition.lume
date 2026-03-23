@@ -1338,6 +1338,20 @@ function FullRecognitionSlide() {
     const [detectorModel, setDetectorModel] = useState('tiny'); 
     
     const [viewingFace, setViewingFace] = useState(null);
+    const registeredFacesRef = useRef([]);
+    const faceMatcherRef = useRef(null);
+    const optionsRef = useRef(null);
+    const detectorModelRef = useRef(detectorModel);
+    const showLandmarksRef = useRef(showLandmarks);
+    const matchThresholdRef = useRef(matchThreshold);
+    const isDetectingRef = useRef(false);
+    const lastUiUpdateRef = useRef(0);
+    const lastVideoSizeRef = useRef({ w: 0, h: 0 });
+    const lastBoxRef = useRef(null);
+    const lastLandmarksRef = useRef(null);
+    const lastLabelRef = useRef(null);
+    const isBoxDetectingRef = useRef(false);
+    const isFullDetectingRef = useRef(false);
 
     // 【修改点】：不再包含任何库的 script 注入逻辑和局域网兜底逻辑
     // 假设全局的 window.faceapi 已经就绪，并且引擎为其分配了最佳资源路径
@@ -1372,6 +1386,29 @@ function FullRecognitionSlide() {
         return () => clearInterval(checkReady);
     }, []);
 
+    useEffect(() => { registeredFacesRef.current = registeredFaces; }, [registeredFaces]);
+    useEffect(() => { detectorModelRef.current = detectorModel; }, [detectorModel]);
+    useEffect(() => { showLandmarksRef.current = showLandmarks; }, [showLandmarks]);
+    useEffect(() => { matchThresholdRef.current = matchThreshold; }, [matchThreshold]);
+
+    useEffect(() => {
+        if (!modelsLoaded || !window.faceapi) return;
+        optionsRef.current = detectorModel === 'tiny'
+            ? new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 })
+            : new window.faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+    }, [modelsLoaded, detectorModel]);
+
+    useEffect(() => {
+        if (!modelsLoaded || !window.faceapi) return;
+        const faces = registeredFacesRef.current || [];
+        if (!faces.length) {
+            faceMatcherRef.current = null;
+            return;
+        }
+        const labeledDescriptors = faces.map(f => new window.faceapi.LabeledFaceDescriptors(f.name, [f.descriptor]));
+        faceMatcherRef.current = new window.faceapi.FaceMatcher(labeledDescriptors, matchThreshold);
+    }, [modelsLoaded, registeredFaces, matchThreshold]);
+
     useEffect(() => {
         if (!modelsLoaded) return;
         const onStream = (stream) => {
@@ -1392,76 +1429,158 @@ function FullRecognitionSlide() {
     useEffect(() => {
         if (!streamActive || !modelsLoaded) return;
 
-        let detectionInterval;
-        let isDetecting = false; 
+        let rafId = 0;
+        let lastBoxAt = 0;
+        let lastFullAt = 0;
         const videoEl = videoRef.current;
         const canvasEl = canvasRef.current;
 
-        const runDetection = async () => {
-            if (videoEl.readyState !== videoEl.HAVE_ENOUGH_DATA) return;
-            if (isDetecting) return;
-
-            isDetecting = true;
-            try {
-                const displaySize = { width: videoEl.videoWidth, height: videoEl.videoHeight };
-                if (displaySize.width === 0 || displaySize.height === 0) return;
-                
+        const ensureCanvas = () => {
+            const displaySize = { width: videoEl.videoWidth, height: videoEl.videoHeight };
+            if (!displaySize.width || !displaySize.height) return null;
+            const prev = lastVideoSizeRef.current || { w: 0, h: 0 };
+            if (prev.w !== displaySize.width || prev.h !== displaySize.height) {
+                lastVideoSizeRef.current = { w: displaySize.width, h: displaySize.height };
                 window.faceapi.matchDimensions(canvasEl, displaySize);
+            }
+            return displaySize;
+        };
 
-                const options = detectorModel === 'tiny' 
-                    ? new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }) 
-                    : new window.faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+        const drawOverlay = () => {
+            const ctx = canvasEl.getContext('2d');
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+            const box = lastBoxRef.current;
+            const label = lastLabelRef.current;
+            if (box) {
+                const color = label && label.color ? label.color : '#22c55e';
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 4;
+                ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+                if (label && label.text) {
+                    const padX = 10;
+                    const padY = 6;
+                    const fontSize = 18;
+                    ctx.font = `bold ${fontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto`;
+                    const textW = ctx.measureText(label.text).width;
+                    const bx = Math.max(0, box.x);
+                    const by = Math.max(0, box.y - (fontSize + padY * 2) - 2);
+                    ctx.fillStyle = 'rgba(15,23,42,0.75)';
+                    ctx.fillRect(bx, by, textW + padX * 2, fontSize + padY * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(label.text, bx + padX, by + padY + fontSize - 4);
+                }
+            }
+
+            if (showLandmarksRef.current && lastLandmarksRef.current && lastLandmarksRef.current.length) {
+                ctx.fillStyle = 'rgba(34,197,94,0.85)';
+                for (const p of lastLandmarksRef.current) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        };
+
+        const runBoxDetection = async (displaySize) => {
+            if (videoEl.readyState !== videoEl.HAVE_ENOUGH_DATA) return;
+            if (isBoxDetectingRef.current || isFullDetectingRef.current) return;
+            isBoxDetectingRef.current = true;
+            try {
+                const fastOptions = new window.faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.5 });
+                const det = await window.faceapi.detectSingleFace(videoEl, fastOptions);
+                if (det) {
+                    const resized = window.faceapi.resizeResults(det, displaySize);
+                    lastBoxRef.current = resized.box;
+                } else {
+                    lastBoxRef.current = null;
+                }
+            } catch (err) {
+                console.error("检测循环出错:", err);
+            } finally {
+                isBoxDetectingRef.current = false;
+            }
+        };
+
+        const runFullDetection = async (displaySize) => {
+            if (videoEl.readyState !== videoEl.HAVE_ENOUGH_DATA) return;
+            if (isFullDetectingRef.current) return;
+            isFullDetectingRef.current = true;
+            isDetectingRef.current = true;
+            try {
+                const options = optionsRef.current || (
+                    detectorModelRef.current === 'tiny'
+                        ? new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 })
+                        : new window.faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })
+                );
 
                 const detection = await window.faceapi.detectSingleFace(videoEl, options)
                     .withFaceLandmarks()
                     .withFaceDescriptor();
 
-                const ctx = canvasEl.getContext('2d');
-                ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-
                 if (detection) {
-                    const resizedDetections = window.faceapi.resizeResults(detection, displaySize);
-                    
-                    window.faceapi.draw.drawDetections(canvasEl, resizedDetections);
-                    if (showLandmarks) {
-                        window.faceapi.draw.drawFaceLandmarks(canvasEl, resizedDetections);
-                    }
+                    const resized = window.faceapi.resizeResults(detection, displaySize);
+                    lastBoxRef.current = resized.detection.box;
+                    lastLandmarksRef.current = resized.landmarks && resized.landmarks.positions ? resized.landmarks.positions : null;
 
-                    setCurrentDescriptor(detection.descriptor);
+                    const matcher = faceMatcherRef.current;
+                    const bestMatch = matcher ? matcher.findBestMatch(detection.descriptor) : null;
+                    lastLabelRef.current = bestMatch
+                        ? { text: bestMatch.toString(), color: bestMatch.label === 'unknown' ? '#ef4444' : '#22c55e' }
+                        : null;
 
-                    if (registeredFaces.length > 0) {
-                        const labeledDescriptors = registeredFaces.map(f => 
-                            new window.faceapi.LabeledFaceDescriptors(f.name, [f.descriptor])
-                        );
-                        const faceMatcher = new window.faceapi.FaceMatcher(labeledDescriptors, matchThreshold);
-                        
-                        const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                    const now = performance.now();
+                    if (now - (lastUiUpdateRef.current || 0) >= 200) {
+                        lastUiUpdateRef.current = now;
+                        setCurrentDescriptor(detection.descriptor);
                         setMatchResult(bestMatch);
-
-                        const drawBox = new window.faceapi.draw.DrawBox(resizedDetections.detection.box, { 
-                            label: bestMatch.toString(),
-                            boxColor: bestMatch.label === 'unknown' ? 'red' : 'green' 
-                        });
-                        drawBox.draw(canvasEl);
-                    } else {
-                        setMatchResult(null);
                     }
                 } else {
-                    setCurrentDescriptor(null);
-                    setMatchResult(null);
-                    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height); 
+                    lastLandmarksRef.current = null;
+                    lastLabelRef.current = null;
+                    const now = performance.now();
+                    if (now - (lastUiUpdateRef.current || 0) >= 200) {
+                        lastUiUpdateRef.current = now;
+                        setCurrentDescriptor(null);
+                        setMatchResult(null);
+                    }
                 }
             } catch (err) {
                 console.error("检测循环出错:", err);
             } finally {
-                isDetecting = false;
+                isFullDetectingRef.current = false;
+                isDetectingRef.current = false;
             }
         };
 
-        detectionInterval = setInterval(runDetection, 150);
+        const tick = (t) => {
+            rafId = requestAnimationFrame(tick);
 
-        return () => clearInterval(detectionInterval);
-    }, [streamActive, modelsLoaded, registeredFaces, matchThreshold, showLandmarks, detectorModel]);
+            const displaySize = ensureCanvas();
+            if (!displaySize) return;
+
+            drawOverlay();
+
+            const boxInterval = 80;
+            if (t - lastBoxAt >= boxInterval) {
+                lastBoxAt = t;
+                runBoxDetection(displaySize);
+            }
+
+            const fullInterval = detectorModelRef.current === 'tiny' ? 240 : 650;
+            if (t - lastFullAt >= fullInterval) {
+                lastFullAt = t;
+                runFullDetection(displaySize);
+            }
+        };
+        rafId = requestAnimationFrame(tick);
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [streamActive, modelsLoaded]);
 
     const handleRegister = () => {
         if (!inputName.trim()) {
