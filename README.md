@@ -113,6 +113,12 @@ window.CourseData = {
 - [docs/course-template.md](./docs/course-template.md)（课件开发模板）
 - [docs/API.md](./docs/API.md)（课件 API 文档）
 
+## 用户使用说明（零基础）
+
+- [docs/用户说明-教师端.md](./docs/用户说明-教师端.md)
+- [docs/用户说明-学生端.md](./docs/用户说明-学生端.md)
+- [docs/用户说明-AI课件编辑器.md](./docs/用户说明-AI课件编辑器.md)
+
 ## 项目结构
 
 ```
