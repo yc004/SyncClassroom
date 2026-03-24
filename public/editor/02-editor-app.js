@@ -2,107 +2,39 @@
 // 萤火课件编辑器 - 主应用程序
 // ========================================================
 
-// 简化的预览组件，用于编辑器中预览课件
-function SimplePreview({ title, slides, contentScale = 0.96, uiScale = 1.0 }) {
-    const [currentSlide, setCurrentSlide] = useState(0);
-    const stageWrapRef = useRef(null);
-    const [stageScale, setStageScale] = useState(1);
-
-    const nextSlide = () => {
-        if (currentSlide < slides.length - 1) setCurrentSlide(currentSlide + 1);
-    };
-
-    const prevSlide = () => {
-        if (currentSlide > 0) setCurrentSlide(currentSlide - 1);
-    };
-
-    // 实现自适应缩放以保持 16:9
-    useEffect(() => {
-        const updateScale = () => {
-            if (!stageWrapRef.current) return;
-            const availableWidth = stageWrapRef.current.clientWidth - 24;
-            const availableHeight = stageWrapRef.current.clientHeight - 24;
-            const baseWidth = 1280;
-            const baseHeight = 720;
-            const scaleW = availableWidth / baseWidth;
-            const scaleH = availableHeight / baseHeight;
-            const nextScale = Math.max(Math.min(scaleW, scaleH, 0.96), 0.1);
-            setStageScale(nextScale);
-        };
-
-        const resizeObserver = new ResizeObserver(updateScale);
-        if (stageWrapRef.current) resizeObserver.observe(stageWrapRef.current);
-        updateScale();
-
-        return () => resizeObserver.disconnect();
-    }, []);
-
+// 复用教师端引擎的预览组件
+function EnginePreview({ title, slides, contentScale = 0.96, uiScale = 1.0 }) {
+    // 使用教师端引擎的 SyncClassroom 组件（离线预览模式，隐藏顶栏但保留底栏翻页）
     return (
         <div className="flex flex-col h-full bg-slate-900">
-            {/* 简化顶栏 */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 shrink-0">
-                <div className="flex items-center space-x-3">
-                    <i className="fas fa-microchip text-blue-500 text-xl"></i>
-                    <h1 className="text-lg font-bold text-white">{title || '预览'}</h1>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <div className="flex space-x-1">
-                        {slides.map((_, idx) => (
-                            <div key={idx} className={`h-2 rounded-full transition-all ${idx === currentSlide ? 'w-6 bg-blue-500' : 'w-2 bg-slate-600'}`} />
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* 课件展示区 - 强制 16:9 */}
             <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden bg-slate-950">
-                <div ref={stageWrapRef} className="w-full h-full flex items-center justify-center overflow-hidden">
-                    <div
-                        style={{
-                            width: '1280px',
-                            height: '720px',
-                            transform: `scale(${stageScale * uiScale})`,
-                            transformOrigin: 'center center',
-                            transition: 'transform 0.2s ease-out'
+                <div className="w-full h-full flex flex-col">
+                    <SyncClassroom
+                        title={title || '预览'}
+                        slides={slides}
+                        isHost={true}
+                        initialSlide={0}
+                        settings={{
+                            forceFullscreen: false,
+                            syncFollow: false,
+                            allowInteract: true,
+                            podiumAtTop: true,
+                            renderScale: contentScale || 0.96,
+                            uiScale: uiScale || 1.0,
+                            alertJoin: false,
+                            alertLeave: false,
+                            alertFullscreenExit: false,
+                            alertTabHidden: false,
                         }}
-                        className="bg-white text-slate-800 relative shadow-2xl flex flex-col rounded-xl overflow-y-auto no-scrollbar shrink-0"
-                    >
-                        <div className="w-full h-full relative overflow-hidden">
-                            <div
-                                className="absolute top-0 left-0"
-                                style={{
-                                    transform: `scale(${contentScale})`,
-                                    transformOrigin: 'top left',
-                                    width: `${100 / (contentScale || 1)}%`,
-                                    height: `${100 / (contentScale || 1)}%`,
-                                }}
-                            >
-                                {slides[currentSlide] && slides[currentSlide].component}
-                            </div>
-                        </div>
-                    </div>
+                        onSettingsChange={() => {}}
+                        socket={null}
+                        studentCount={0}
+                        studentLog={[]}
+                        onEndCourse={() => {}}
+                        hideTopBar={true}
+                        hideBottomBar={false}
+                    />
                 </div>
-            </div>
-
-            {/* 简化底栏 */}
-            <div className="flex items-center justify-center gap-4 px-6 py-4 bg-slate-800 border-t border-slate-700 shrink-0">
-                <button 
-                    onClick={prevSlide} 
-                    disabled={currentSlide === 0}
-                    className={`flex items-center px-4 py-2 rounded-lg font-bold transition-all ${currentSlide === 0 ? 'text-slate-500 bg-slate-700 cursor-not-allowed' : 'text-white bg-blue-600 hover:bg-blue-500'}`}
-                >
-                    <i className="fas fa-chevron-left mr-2"></i>上一页
-                </button>
-                <span className="text-slate-400 font-bold bg-slate-700 px-4 py-2 rounded-lg">
-                    {currentSlide + 1} / {slides.length}
-                </span>
-                <button 
-                    onClick={nextSlide} 
-                    disabled={currentSlide === slides.length - 1}
-                    className={`flex items-center px-4 py-2 rounded-lg font-bold transition-all ${currentSlide === slides.length - 1 ? 'text-slate-500 bg-slate-700 cursor-not-allowed' : 'text-white bg-blue-600 hover:bg-blue-500'}`}
-                >
-                    下一页<i className="fas fa-chevron-right ml-2"></i>
-                </button>
             </div>
         </div>
     );
@@ -1001,8 +933,8 @@ window.CourseData = {
                         ) : compileError ? (
                             <ErrorBoundary error={compileError} onAutoFix={handleAutoFix} />
                         ) : compiledCourseData ? (
-                            // 使用简化的预览组件，避免 SyncClassroom 的复杂依赖
-                            <SimplePreview 
+                            // 使用教师端引擎的预览组件，确保渲染一致性
+                            <EnginePreview 
                                 title={compiledCourseData.title}
                                 slides={compiledCourseData.slides}
                                 uiScale={clampedUiScale}

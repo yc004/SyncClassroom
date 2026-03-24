@@ -1,7 +1,7 @@
 // ========================================================
 // 课堂主界面组件（教师端 + 学生端共用）
 // ========================================================
-function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: initialIsHost, initialSlide, settings, onSettingsChange, studentCount, studentLog }) {
+function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: initialIsHost, initialSlide, settings, onSettingsChange, studentCount, studentLog, hideTopBar = false, hideBottomBar = false }) {
     const [currentSlide, setCurrentSlide] = useState(initialSlide || 0);
     const [isHost, setIsHost] = useState(initialIsHost || false);
     const [roleAssigned, setRoleAssigned] = useState(true);
@@ -482,6 +482,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
         <div className="flex flex-col h-screen bg-slate-900 text-slate-800 font-sans overflow-hidden select-none">
 
             {/* 顶栏 */}
+            {!hideTopBar && (
             <div className="flex items-center justify-between px-6 md:px-8 py-4 bg-white shadow-md z-20 relative h-[72px] shrink-0" style={{WebkitAppRegion:'drag'}}>
                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <i className="fas fa-microchip text-blue-600 text-2xl md:text-3xl"></i>
@@ -540,6 +541,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
                     )}
                 </div>
             </div>
+            )}
 
             {/* 课件展示区 */}
             <div className="flex-1 relative flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden">
@@ -663,6 +665,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
             </div>
 
             {/* 底栏导航 */}
+            {!hideBottomBar && (
             <div className="flex items-center justify-between px-6 md:px-10 py-4 bg-white border-t border-slate-200 shadow-[0_-4px_15px_-3px_rgba(0,0,0,0.1)] z-20 relative h-[72px] shrink-0">
                 {isHost ? (
                     <>
@@ -832,6 +835,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
                     )
                 )}
             </div>
+            )}
 
             {/* 日志面板 */}
             {isHost && showLog && (
