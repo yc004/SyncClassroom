@@ -28,16 +28,49 @@ app.use(express.urlencoded({ extended: false }));
 
 // 扫描 courses 目录获取所有可用课程
 const coursesDir = path.join(__dirname, 'public', 'courses');
+const folderDataPath = path.join(__dirname, 'public', 'data', 'course-folders.json');
+
+// 加载文件夹配置
+function loadFolderData() {
+    try {
+        if (fs.existsSync(folderDataPath)) {
+            const content = fs.readFileSync(folderDataPath, 'utf-8');
+            return JSON.parse(content);
+        }
+    } catch (err) {
+        console.warn('[loadFolderData] Failed to load folder data:', err.message);
+    }
+    return { folders: [], courses: {} };
+}
+
+// 保存文件夹配置
+function saveFolderData(data) {
+    try {
+        const dataDir = path.dirname(folderDataPath);
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+        }
+        fs.writeFileSync(folderDataPath, JSON.stringify(data, null, 2), 'utf-8');
+        return true;
+    } catch (err) {
+        console.error('[saveFolderData] Failed to save folder data:', err.message);
+        return false;
+    }
+}
 
 function scanCourses() {
     if (!fs.existsSync(coursesDir)) {
         fs.mkdirSync(coursesDir, { recursive: true });
-        return [];
+        return { courses: [], folders: loadFolderData().folders };
     }
-    
+
     const files = fs.readdirSync(coursesDir);
     const allowedExts = ['.lume', '.tsx', '.ts', '.jsx', '.js', '.pdf'];
     const extPriority = { '.lume': 5, '.tsx': 4, '.ts': 3, '.jsx': 2, '.js': 1, '.pdf': 0 };
+
+    // 加载文件夹数据
+    const folderData = loadFolderData();
+    const courseFolderMap = folderData.courses || {};
 
     const courses = files
         .filter(f => allowedExts.includes(path.extname(f).toLowerCase()))
@@ -51,6 +84,9 @@ function scanCourses() {
                 mtimeMs = fs.statSync(filePath).mtimeMs || 0;
             } catch (_) {}
 
+            // 获取课件所属文件夹
+            const folderId = courseFolderMap[courseId] || null;
+
             if (ext === '.pdf') {
                 return {
                     id: courseId,
@@ -60,6 +96,7 @@ function scanCourses() {
                     desc: 'PDF课件',
                     color: 'from-rose-500 to-orange-600',
                     type: 'pdf',
+                    folderId,
                     _extPriority: extPriority[ext] || 0,
                     _mtimeMs: mtimeMs
                 };
@@ -72,13 +109,13 @@ function scanCourses() {
                 console.warn(`[scanCourses] [SKIP] 跳过无法读取的文件: ${f} (${err.message})`);
                 return null;
             }
-            
+
             // 尝试从文件中提取课程元数据
             let title = courseId;
             let icon = '📚';
             let desc = '';
             let color = 'from-blue-500 to-indigo-600';
-            
+
             // 匹配 window.CourseData 中的元数据
             // 先定位 window.CourseData 位置，只从该位置之后提取，避免误匹配幻灯片内容中的同名字段
             const courseDataIndex = content.indexOf('window.CourseData');
@@ -88,12 +125,12 @@ function scanCourses() {
             const iconMatch = metaContent.match(/icon:\s*["'](.+?)["']/);
             const descMatch = metaContent.match(/desc:\s*["'](.+?)["']/);
             const colorMatch = metaContent.match(/color:\s*["'](.+?)["']/);
-            
+
             if (titleMatch) title = titleMatch[1];
             if (iconMatch) icon = iconMatch[1];
             if (descMatch) desc = descMatch[1];
             if (colorMatch) color = colorMatch[1];
-            
+
             return {
                 id: courseId,
                 file: f,
@@ -102,6 +139,7 @@ function scanCourses() {
                 desc,
                 color,
                 type: 'script',
+                folderId,
                 _extPriority: extPriority[path.extname(f).toLowerCase()] || 0,
                 _mtimeMs: mtimeMs
             };
@@ -123,7 +161,11 @@ function scanCourses() {
 
     const deduped = Array.from(byId.values());
     deduped.sort((a, b) => (b._mtimeMs || 0) - (a._mtimeMs || 0));
-    return deduped.map(({ _mtimeMs, _extPriority, ...rest }) => rest);
+
+    return {
+        courses: deduped.map(({ _mtimeMs, _extPriority, ...rest }) => rest),
+        folders: folderData.folders || []
+    };
 }
 
 // 当前选中的课程和课程状态
@@ -604,8 +646,11 @@ app.get('/api/health', (req, res) => {
 
 // 获取课程列表
 app.get('/api/courses', (req, res) => {
+    const catalog = typeof courseCatalog === 'object' && 'courses' in courseCatalog
+        ? courseCatalog
+        : { courses: courseCatalog, folders: loadFolderData().folders };
     res.json({
-        courses: courseCatalog,
+        ...catalog,
         currentCourseId: currentCourseId,
         currentSlideIndex: currentSlideIndex
     });
@@ -622,7 +667,7 @@ app.get('/api/course-status', (req, res) => {
 // 刷新课程列表（重新扫描目录）
 app.post('/api/refresh-courses', (req, res) => {
     courseCatalog = scanCourses();
-    res.json({ success: true, courses: courseCatalog });
+    res.json({ success: true, ...courseCatalog });
 });
 
 // 删除指定课件
@@ -631,24 +676,255 @@ app.delete('/api/delete-course', (req, res) => {
     if (!courseId) {
         return res.status(400).json({ success: false, error: '缺少 courseId 参数' });
     }
-    
-    const course = courseCatalog.find(c => c.id === courseId);
+
+    const catalog = typeof courseCatalog === 'object' && 'courses' in courseCatalog
+        ? courseCatalog.courses
+        : courseCatalog;
+    const course = catalog.find(c => c.id === courseId);
     if (!course) {
         return res.status(404).json({ success: false, error: '课件不存在' });
     }
-    
+
     const filePath = path.join(coursesDir, course.file);
     try {
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
             console.log(`[delete-course] deleted: ${course.file}`);
         }
+        // 从文件夹配置中移除
+        const folderData = loadFolderData();
+        if (folderData.courses && folderData.courses[courseId]) {
+            delete folderData.courses[courseId];
+            saveFolderData(folderData);
+        }
         // 更新课程目录
         courseCatalog = scanCourses();
-        res.json({ success: true, courses: courseCatalog });
+        res.json({ success: true, ...courseCatalog });
     } catch (err) {
         console.error(`[delete-course] error:`, err);
         res.status(500).json({ success: false, error: '删除文件失败' });
+    }
+});
+
+// ========================================================
+// 课程文件夹管理 API
+// ========================================================
+
+// 创建文件夹
+app.post('/api/course-folders', (req, res) => {
+    const { name, icon, parentId } = req.body;
+    if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: '文件夹名称不能为空' });
+    }
+
+    const folderData = loadFolderData();
+    folderData.folders = folderData.folders || [];
+
+    // 检查是否已存在同名文件夹
+    const parentToCheck = parentId === null || parentId === undefined ? null : parentId;
+    const existingFolder = folderData.folders.find(f => {
+        const folderParent = f.parentId === null || f.parentId === undefined ? null : f.parentId;
+        return f.name === name.trim() && folderParent === parentToCheck;
+    });
+
+    if (existingFolder) {
+        return res.status(400).json({ success: false, error: `文件夹 "${name}" 已存在` });
+    }
+
+    const folderId = `folder-${Date.now()}`;
+    const newFolder = {
+        id: folderId,
+        name: name.trim(),
+        icon: icon || '📁',
+        parentId: parentId || null,
+        createdAt: new Date().toISOString()
+    };
+
+    folderData.folders.push(newFolder);
+
+    if (saveFolderData(folderData)) {
+        courseCatalog = scanCourses();
+        res.json({ success: true, folder: newFolder, ...courseCatalog });
+    } else {
+        res.status(500).json({ success: false, error: '保存失败' });
+    }
+});
+
+// 删除文件夹（支持递归删除子文件夹）
+app.delete('/api/course-folders/:folderId', (req, res) => {
+    const { folderId } = req.params;
+    if (!folderId) {
+        return res.status(400).json({ success: false, error: '缺少 folderId 参数' });
+    }
+
+    const folderData = loadFolderData();
+    if (!folderData.folders || !folderData.folders.find(f => f.id === folderId)) {
+        return res.status(404).json({ success: false, error: '文件夹不存在' });
+    }
+
+    // 递归获取所有子文件夹ID
+    const getSubFolderIds = (parentId) => {
+        const subFolders = folderData.folders.filter(f => f.parentId === parentId);
+        let ids = subFolders.map(f => f.id);
+        subFolders.forEach(sub => {
+            ids = ids.concat(getSubFolderIds(sub.id));
+        });
+        return ids;
+    };
+
+    const allFolderIdsToDelete = [folderId, ...getSubFolderIds(folderId)];
+
+    // 将这些文件夹中的课件移出文件夹
+    if (folderData.courses) {
+        for (const courseId in folderData.courses) {
+            if (allFolderIdsToDelete.includes(folderData.courses[courseId])) {
+                delete folderData.courses[courseId];
+            }
+        }
+    }
+
+    // 删除所有这些文件夹
+    folderData.folders = folderData.folders.filter(f => !allFolderIdsToDelete.includes(f.id));
+
+    if (saveFolderData(folderData)) {
+        courseCatalog = scanCourses();
+        res.json({ success: true, ...courseCatalog });
+    } else {
+        res.status(500).json({ success: false, error: '保存失败' });
+    }
+});
+
+// 移动文件夹（必须放在重命名路由之前，避免路由冲突）
+app.put('/api/course-folders/:folderId/move', (req, res) => {
+    const { folderId } = req.params;
+    const { targetFolderId } = req.body;
+
+    if (!folderId) {
+        return res.status(400).json({ success: false, error: '缺少 folderId 参数' });
+    }
+
+    const folderData = loadFolderData();
+
+    // 验证源文件夹是否存在
+    const folderToMove = folderData.folders?.find(f => f.id === folderId);
+    if (!folderToMove) {
+        return res.status(404).json({ success: false, error: '源文件夹不存在' });
+    }
+
+    // 验证目标文件夹是否存在（如果是 'null' 则表示移到根目录）
+    if (targetFolderId !== 'null' && !folderData.folders?.find(f => f.id === targetFolderId)) {
+        return res.status(404).json({ success: false, error: '目标文件夹不存在' });
+    }
+
+    // 不能将文件夹移动到自己的子文件夹中
+    if (targetFolderId !== 'null') {
+        const isDescendant = (parentId, childId) => {
+            if (parentId === childId) return true;
+            const childFolders = folderData.folders.filter(f => f.parentId === parentId);
+            for (const child of childFolders) {
+                if (isDescendant(child.id, childId)) return true;
+            }
+            return false;
+        };
+        if (isDescendant(folderId, targetFolderId)) {
+            return res.status(400).json({ success: false, error: '不能将文件夹移动到其子文件夹中' });
+        }
+    }
+
+    // 更新文件夹的parentId
+    folderToMove.parentId = targetFolderId === 'null' ? null : targetFolderId;
+
+    if (saveFolderData(folderData)) {
+        courseCatalog = scanCourses();
+        res.json({ success: true, ...courseCatalog });
+    } else {
+        res.status(500).json({ success: false, error: '保存失败' });
+    }
+});
+
+// 重命名文件夹
+app.put('/api/course-folders/:folderId', (req, res) => {
+    const { folderId } = req.params;
+    const { name, icon } = req.body;
+
+    if (!folderId) {
+        return res.status(400).json({ success: false, error: '缺少 folderId 参数' });
+    }
+
+    if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: '文件夹名称不能为空' });
+    }
+
+    const folderData = loadFolderData();
+    const folder = folderData.folders?.find(f => f.id === folderId);
+
+    if (!folder) {
+        return res.status(404).json({ success: false, error: '文件夹不存在' });
+    }
+
+    // 检查是否已存在同名文件夹（排除自己）
+    const folderParent = folder.parentId === null || folder.parentId === undefined ? null : folder.parentId;
+    const existingFolder = folderData.folders.find(f => {
+        const fParent = f.parentId === null || f.parentId === undefined ? null : f.parentId;
+        return f.id !== folderId && f.name === name.trim() && fParent === folderParent;
+    });
+
+    if (existingFolder) {
+        return res.status(400).json({ success: false, error: `文件夹 "${name}" 已存在` });
+    }
+
+    folder.name = name.trim();
+    if (icon !== undefined) {
+        folder.icon = icon;
+    }
+    folder.updatedAt = new Date().toISOString();
+
+    if (saveFolderData(folderData)) {
+        courseCatalog = scanCourses();
+        res.json({ success: true, folder, ...courseCatalog });
+    } else {
+        res.status(500).json({ success: false, error: '保存失败' });
+    }
+});
+
+// 移动课件到文件夹
+app.put('/api/course-folders/:folderId/courses/:courseId', (req, res) => {
+    const { folderId, courseId } = req.params;
+
+    if (!courseId) {
+        return res.status(400).json({ success: false, error: '缺少 courseId 参数' });
+    }
+
+    const folderData = loadFolderData();
+
+    // 验证文件夹是否存在（如果是 'null' 则表示移出文件夹）
+    if (folderId !== 'null' && !folderData.folders?.find(f => f.id === folderId)) {
+        return res.status(404).json({ success: false, error: '目标文件夹不存在' });
+    }
+
+    // 验证课件是否存在
+    const catalog = typeof courseCatalog === 'object' && 'courses' in courseCatalog
+        ? courseCatalog.courses
+        : courseCatalog;
+    if (!catalog.find(c => c.id === courseId)) {
+        return res.status(404).json({ success: false, error: '课件不存在' });
+    }
+
+    // 更新课件所属文件夹
+    folderData.courses = folderData.courses || {};
+    if (folderId === 'null') {
+        // 移出文件夹
+        delete folderData.courses[courseId];
+    } else {
+        // 移入文件夹
+        folderData.courses[courseId] = folderId;
+    }
+
+    if (saveFolderData(folderData)) {
+        courseCatalog = scanCourses();
+        res.json({ success: true, ...courseCatalog });
+    } else {
+        res.status(500).json({ success: false, error: '保存失败' });
     }
 });
 
@@ -1150,7 +1426,8 @@ io.on('connection', (socket) => {
     // 课程切换（仅老师端可操作）
     socket.on('select-course', (data) => {
         if (role === 'host') {
-            const course = courseCatalog.find(c => c.id === data.courseId);
+            const courses = Array.isArray(courseCatalog) ? courseCatalog : courseCatalog.courses;
+            const course = courses.find(c => c.id === data.courseId);
             if (course) {
                 annotationStore.clear();
                 currentCourseId = data.courseId;

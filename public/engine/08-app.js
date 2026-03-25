@@ -175,7 +175,15 @@ function ClassroomApp() {
 
         socketRef.current.on('role-assigned', (data) => {
             setIsHost(data.role === 'host');
-            const catalog = data.courseCatalog || [];
+            // 处理 courseCatalog 可能是对象 {courses: [...], folders: [...]} 或数组的情况
+            let catalog = data.courseCatalog || [];
+            if (!Array.isArray(catalog) && catalog.courses) {
+                // 如果是完整对象，保持完整对象格式
+                catalog = catalog;
+            } else if (Array.isArray(catalog) && !catalog.folders) {
+                // 如果是数组且没有 folders 属性，转换为完整对象格式
+                catalog = { courses: catalog, folders: data.folders || [] };
+            }
             setCourseCatalog(catalog);
             courseCatalogRef.current = catalog;
             setCurrentCourseId(data.currentCourseId);
@@ -258,8 +266,17 @@ function ClassroomApp() {
         });
 
         socketRef.current.on('course-catalog-updated', (data) => {
-            setCourseCatalog(data.courses);
-            courseCatalogRef.current = data.courses;
+            // 处理 data.courses 可能是对象 {courses: [...], folders: [...]} 或数组的情况
+            let catalog = data.courses || [];
+            if (!Array.isArray(catalog) && catalog.courses) {
+                // 如果是完整对象，保持完整对象格式
+                catalog = catalog;
+            } else if (Array.isArray(catalog) && !catalog.folders) {
+                // 如果是数组且没有 folders 属性，转换为完整对象格式
+                catalog = { courses: catalog, folders: data.folders || [] };
+            }
+            setCourseCatalog(catalog);
+            courseCatalogRef.current = catalog;
         });
 
         socketRef.current.on('student-log-entry', (entry) => {
@@ -280,7 +297,11 @@ function ClassroomApp() {
     }, []);
 
     const loadCourse = async (courseId, catalog) => {
-        const courseList = catalog || courseCatalogRef.current;
+        let courseList = catalog || courseCatalogRef.current;
+        // 处理 courseList 可能是对象 {courses: [...], folders: [...]} 的情况
+        if (courseList && !Array.isArray(courseList) && courseList.courses) {
+            courseList = courseList.courses;
+        }
         const course = courseList.find(c => c.id === courseId);
         if (!course) {
             console.error('[ClassroomApp] course not found: ' + courseId);
