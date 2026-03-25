@@ -298,6 +298,19 @@ const AIChat = React.forwardRef(({ onCodeGenerated, onGeneratingStatusChange, cu
         }
 
         const sendingAttachments = overrideInput ? [] : attachments;
+        
+        // 检测模型是否支持多模态（图片）输入
+        const visionSupportedModels = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-vision-preview', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku', 'claude-3.5-sonnet', 'claude-3.5-opus'];
+        const hasImageAttachment = sendingAttachments.some(a => a.kind === 'image');
+        const modelName = config.model || '';
+        const supportsVision = visionSupportedModels.some(m => modelName.toLowerCase().includes(m.toLowerCase()));
+        
+        if (hasImageAttachment && !supportsVision) {
+            setAttachmentNotice({ type: 'error', message: `当前模型 "${modelName}" 不支持图片输入。请使用支持多模态的模型，如 gpt-4o、gpt-4o-mini 或 Claude 3 系列。` });
+            setTimeout(() => setAttachmentNotice(null), 4000);
+            return;
+        }
+
         const userDisplayContent = messageText + summarizeAttachmentsForChat(sendingAttachments);
         const userMsg = { role: 'user', content: userDisplayContent };
         const newMessages = [...messages, userMsg];

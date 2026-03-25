@@ -518,7 +518,9 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
             }
             if (window._onCamActive) window._onCamActive(false);
             setCurrentSlide(index);
-            if (isHost) socketRef.current.emit('sync-slide', { slideIndex: index });
+            if (isHost && socketRef.current) {
+                socketRef.current.emit('sync-slide', { slideIndex: index });
+            }
         }
     };
     const nextSlide = () => goToSlide(currentSlide + 1);

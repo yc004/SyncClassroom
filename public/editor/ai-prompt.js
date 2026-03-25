@@ -50,6 +50,24 @@ window.__LUMESYNC_AI_PROMPT__ = `
   - 存储模式：
     * 独立文件（默认）：\`{学生名称或IP}-{文件名}\`，如 \`张三-answer.txt\`
     * 合并文件：所有学生提交到同一个 CSV 文件，包含 Timestamp、IP、Content、StudentName
+- **教师-学生交互同步（非常重要！）**：
+  - \`window.CourseGlobalContext.useSyncVar(key, initialValue)\`：使用同步变量，教师端的操作会自动同步到所有学生端。
+    - \`key\`: 唯一标识符（建议格式：\`slide-id:variable-name\`，如 \`knn-demo:k-value\`）
+    - \`initialValue\`: 初始值（可以是字符串、数字、布尔值、对象、数组等）
+    - 返回：\`[value, setValue]\`，使用方式与 \`useState\` 完全相同
+    - 示例：
+      \`\`\`tsx
+      const [selectedOption, setSelectedOption] = window.CourseGlobalContext.useSyncVar('quiz:answer', null);
+      const [dragItems, setDragItems] = window.CourseGlobalContext.useSyncVar('drag:items', initialItems);
+      const [showPanel, setShowPanel] = window.CourseGlobalContext.useSyncVar('panel:visible', false);
+      \`\`\`
+  - \`window.CourseGlobalContext.useLocalVar(key, initialValue)\`：使用本地变量，仅在本地变化，**不会同步**到学生端。
+    - 适用于：菜单展开/折叠状态、本地 UI 动画状态等不需要同步的 UI 状态
+    - 示例：
+      \`\`\`tsx
+      const [localMenuOpen, setLocalMenuOpen] = window.CourseGlobalContext.useLocalVar('menu:open', false);
+      \`\`\`
+  - **重要规则**：凡是教师端操作后希望学生端同步显示的状态，**必须**使用 \`useSyncVar\`，不要用 \`useState\`！
 - 内置组件库（可选）：引擎提供 \`window.CourseComponents\`，课件可直接使用内置组件（无需 import）。常用：
   - \`WebPageSlide\`：纯网页页（iframe 内嵌 + "刷新/打开"兜底）。用法：
   \`\`\`tsx
