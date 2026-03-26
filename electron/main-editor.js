@@ -532,3 +532,27 @@ ipcMain.handle('save-course-file', async (event, { content, filePath, suggestedN
         return { success: false, error: error.message };
     }
 });
+
+// 加载知识库
+ipcMain.handle('load-knowledge-base', () => {
+    const knowledgePath = path.join(app.getPath('userData'), 'knowledge-base.json');
+    try {
+        if (fs.existsSync(knowledgePath)) {
+            const content = fs.readFileSync(knowledgePath, 'utf-8');
+            return JSON.parse(content);
+        }
+    } catch (e) { console.error('Load knowledge base error:', e); }
+    return [];
+});
+
+// 保存知识库
+ipcMain.handle('save-knowledge-base', (event, items) => {
+    const knowledgePath = path.join(app.getPath('userData'), 'knowledge-base.json');
+    try {
+        fs.writeFileSync(knowledgePath, JSON.stringify(items, null, 2), 'utf-8');
+        return { success: true };
+    } catch (e) {
+        console.error('Save knowledge base error:', e);
+        return { success: false, error: e.message };
+    }
+});

@@ -20,6 +20,8 @@ const AIChat = React.forwardRef(({ onCodeGenerated, onGeneratingStatusChange, cu
     const [testResult, setTestResult] = useState({ type: '', message: '' });
     const [attachments, setAttachments] = useState([]);
     const [attachmentNotice, setAttachmentNotice] = useState(null);
+    const [knowledgeItems, setKnowledgeItems] = useState([]);
+    const [ragDecision, setRagDecision] = useState(null);
     const chatEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const [selectedCode, setSelectedCode] = useState(null); // 选中的代码片段
@@ -28,6 +30,95 @@ const AIChat = React.forwardRef(({ onCodeGenerated, onGeneratingStatusChange, cu
     const MAX_TOTAL_BYTES = 6 * 1024 * 1024;
     const MAX_TEXT_BYTES = 500 * 1024;
     const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+
+    // 从统一的知识库文件加载内置知识（通过 window.builtinKnowledgeBase）
+    const loadBuiltinKnowledge = () => {
+        // 知识库已在 editor.html 中通过 script 标签加载到 window.builtinKnowledgeBase
+        return window.builtinKnowledgeBase || [];
+    };
+
+    // RAG系统：加载知识库
+    const loadKnowledgeBase = async () => {
+        try {
+            // 加载内置知识库（直接从 window 获取）
+            const builtinData = loadBuiltinKnowledge();
+            console.log('[RAG] 内置知识已加载:', builtinData.length, '条');
+
+            // 加载用户自定义知识库
+            let userData = [];
+            if (window.electronAPI?.loadKnowledgeBase) {
+                userData = await window.electronAPI.loadKnowledgeBase();
+                console.log('[RAG] 用户知识已加载:', userData.length, '条');
+            }
+
+            // 合并内置知识和用户知识
+            const allKnowledge = [...builtinData, ...(userData || [])];
+            setKnowledgeItems(allKnowledge);
+            console.log('[RAG] 知识库总计:', allKnowledge.length, '条');
+        } catch (error) {
+            console.error('[RAG] 加载知识库失败:', error);
+            // 如果加载失败，尝试至少加载内置知识
+            const builtinData = loadBuiltinKnowledge();
+            setKnowledgeItems(builtinData);
+        }
+    };
+
+    // RAG 检索：根据查询返回最相关的知识块
+    const retrieveKnowledge = (query, topK = 3) => {
+        if (!query || !knowledgeItems.length) return [];
+
+        // 使用内置的检索函数（如果可用），否则使用简单的关键词匹配
+        if (typeof window.retrieveKnowledge === 'function') {
+            return window.retrieveKnowledge(query, topK);
+        }
+
+        // 简单的关键词匹配（备用方案）
+        const keywords = query
+            .toLowerCase()
+            .replace(/[^\w\u4e00-\u9fa5]+/g, ' ')
+            .split(' ')
+            .filter(k => k.length > 0);
+
+        const scored = knowledgeItems.map(item => {
+            const text = `${item.title} ${(item.tags || []).join(' ')} ${item.content}`.toLowerCase();
+            let score = 0;
+            keywords.forEach(keyword => {
+                const matches = text.match(new RegExp(keyword, 'gi'));
+                if (matches) score += matches.length;
+            });
+            return { ...item, score };
+        });
+
+        return scored
+            .sort((a, b) => b.score - a.score)
+            .slice(0, topK)
+            .map(({ score, ...rest }) => rest);
+    };
+
+    useEffect(() => {
+        loadKnowledgeBase();
+    }, []);
+
+    // RAG决策：判断是否需要查询知识库
+    const shouldRetrieveKnowledge = async (userQuery) => {
+        console.log('[RAG] 开始检索, 知识库条目数:', knowledgeItems.length, '用户查询:', userQuery);
+
+        if (!userQuery || !knowledgeItems.length) {
+            console.log('[RAG] 检索失败: 缺少查询或知识库为空');
+            return { shouldRetrieve: false, relevantItems: [] };
+        }
+
+        // 使用新的检索函数
+        const relevantItems = retrieveKnowledge(userQuery, 3);
+
+        if (relevantItems.length === 0) {
+            console.log('[RAG] 未匹配到相关知识');
+            return { shouldRetrieve: false, relevantItems: [] };
+        }
+
+        console.log('[RAG] 匹配到', relevantItems.length, '条相关知识:', relevantItems.map(i => i.title));
+        return { shouldRetrieve: true, relevantItems, matchedKeywords: [] };
+    };
 
     // 智能识别与用户请求相关的代码段
     const extractRelevantCode = (fullCode, userRequest) => {
@@ -513,10 +604,44 @@ const AIChat = React.forwardRef(({ onCodeGenerated, onGeneratingStatusChange, cu
         let currentFullText = '';
         let lastAppliedLen = 0;
 
+        // RAG决策：判断是否需要查询知识库
+        const ragResult = await shouldRetrieveKnowledge(messageText);
+        setRagDecision(ragResult);
+
+        console.log('[RAG] 决策结果:', {
+            shouldRetrieve: ragResult.shouldRetrieve,
+            relevantItemsCount: ragResult.relevantItems.length,
+            matchedKeywords: ragResult.matchedKeywords
+        });
+
         // 如果是部分修改模式，修改提示词
         let systemPrompt = AI_PROMPT;
+
+        // RAG系统：动态添加相关知识到提示词
+        if (ragResult.shouldRetrieve && ragResult.relevantItems.length > 0) {
+            const knowledgeBaseText = ragResult.relevantItems.map(kb =>
+                `【${kb.title}】\n分类：${kb.category}\n${kb.content}`
+            ).join('\n\n---\n\n');
+
+            console.log('[RAG] 已将以下知识注入到提示词:', ragResult.relevantItems.map(k => k.title));
+
+            systemPrompt = `${systemPrompt}
+
+【RAG检索结果】
+根据用户的查询，AI已自主检索到以下相关知识：
+
+${knowledgeBaseText}
+
+请参考以上知识库内容生成高质量的课件代码。`;
+
+            // 在聊天界面显示RAG使用了哪些知识
+            console.log('[RAG] 知识库应用成功,知识数量:', ragResult.relevantItems.length);
+        } else {
+            console.log('[RAG] 未检索到相关知识,使用原始提示词');
+        }
+
         if (usePartialEdit && relevantCode) {
-            systemPrompt = AI_PROMPT + `
+            systemPrompt += `
 
 【部分修改模式（重要）】
 用户要求对现有代码进行修改，而不是重新生成整个课件。
@@ -740,7 +865,7 @@ ${relevantCode}
                     // 处理助手消息，提取文本和代码标识
                     let displayText = msg.content;
                     const hasCode = msg.role === 'assistant' && (msg.content.includes('```') || msg.content.includes('window.CourseData'));
-                    
+
                     if (hasCode) {
                         // 移除代码块部分，只显示文字说明
                         displayText = msg.content.replace(/```(?:typescript|ts|tsx|javascript|js|jsx)?\n[\s\S]*?(?:\n```|$)/g, '').trim();
@@ -748,14 +873,18 @@ ${relevantCode}
                         if (!displayText) displayText = '我已为您生成了代码：';
                     }
 
+                    // 检查是否是最后一条用户消息，显示RAG决策结果
+                    const isLastUserMsg = msg.role === 'user' && i === messages.length - 2;
+                    const showRagInfo = isLastUserMsg && ragDecision?.shouldRetrieve && ragDecision.relevantItems.length > 0;
+
                     return (
                         <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                             <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-700 text-slate-200 rounded-bl-none'} chat-selectable shadow-sm`}>
-                                <div 
+                                <div
                                     className={`text-sm leading-relaxed ${msg.role === 'assistant' ? 'markdown-content' : 'whitespace-pre-wrap'}`}
                                     dangerouslySetInnerHTML={
-                                        msg.role === 'assistant' 
-                                            ? { __html: window.marked ? window.marked.parse(displayText) : displayText } 
+                                        msg.role === 'assistant'
+                                            ? { __html: window.marked ? window.marked.parse(displayText) : displayText }
                                             : null
                                     }
                                 >
@@ -769,6 +898,27 @@ ${relevantCode}
                                     </div>
                                 )}
                             </div>
+                            {showRagInfo && (
+                                <div className="mt-2 max-w-[85%] bg-purple-900/30 border border-purple-700/50 rounded-xl px-4 py-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <div className="flex items-center gap-2 text-purple-300 text-xs font-bold mb-2">
+                                        <i className="fas fa-brain"></i>
+                                        RAG 知识检索
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {ragDecision.relevantItems.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 text-xs">
+                                                <span className="text-purple-400">{idx + 1}.</span>
+                                                <span className="text-slate-300 font-medium">{item.title}</span>
+                                                {item.category && (
+                                                    <span className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400 text-xs">
+                                                        {item.category}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })}

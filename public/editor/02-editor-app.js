@@ -738,63 +738,66 @@ window.CourseData = {
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 
                 {/* 顶栏 */}
-                <div className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 shrink-0" style={{WebkitAppRegion:'drag'}}>
-                    <div className="flex items-center space-x-3">
-                        <i className="fas fa-wand-magic-sparkles text-amber-400 text-2xl"></i>
-                        <h1 className="text-xl font-bold text-white tracking-wide">AI 课件编辑器</h1>
-                    </div>
-                    
-                    <div className="flex items-center space-x-4" style={{WebkitAppRegion:'no-drag'}}>
+                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-800 border-b border-slate-700 shrink-0" style={{WebkitAppRegion:'drag'}}>
+                    <div className="flex items-center gap-4">
+                        {/* Logo */}
+                        <div className="flex items-center gap-2">
+                            <i className="fas fa-wand-magic-sparkles text-amber-400 text-lg"></i>
+                            <h1 className="text-lg font-bold text-white tracking-wide">AI 课件编辑器</h1>
+                        </div>
+
                         {/* 视图切换 */}
-                        <div className="bg-slate-900 rounded-lg p-1 flex shadow-inner border border-slate-700">
+                        <div className="bg-slate-900 rounded-lg p-0.5 flex shadow-inner border border-slate-700" style={{WebkitAppRegion:'no-drag'}}>
                             <button 
                                 onClick={() => setViewMode('preview')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors flex items-center ${viewMode === 'preview' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition-colors flex items-center ${viewMode === 'preview' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
                             >
-                                <i className={`fas ${pdfPreview ? 'fa-file-pdf' : 'fa-eye'} mr-2`}></i> {pdfPreview ? 'PDF预览' : '实时预览'}
+                                <i className={`fas ${pdfPreview ? 'fa-file-pdf' : 'fa-eye'} mr-1.5 text-xs`}></i> {pdfPreview ? 'PDF预览' : '实时预览'}
                             </button>
                             <button 
                                 onClick={() => setViewMode('code')}
                                 disabled={!!pdfPreview}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors flex items-center ${
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition-colors flex items-center ${
                                     pdfPreview
                                         ? 'text-slate-600 cursor-not-allowed'
                                         : (viewMode === 'code' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200')
                                 }`}
                             >
-                                <i className="fas fa-code mr-2"></i> 源码编辑
+                                <i className="fas fa-code mr-1.5 text-xs"></i> 源码编辑
                             </button>
                         </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2" style={{WebkitAppRegion:'no-drag'}}>
+                        {/* 知识库按钮 */}
+                        <KnowledgeBase />
 
+                        {/* 缩放设置 - 紧凑版 */}
                         <div className="relative">
                             <button
                                 onClick={() => setShowScalePanel(v => !v)}
-                                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm font-bold flex items-center shadow-md"
+                                className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors text-xs font-bold flex items-center shadow-md"
                                 title="缩放设置"
                             >
-                                <i className="fas fa-up-down-left-right mr-2"></i>
-                                {Math.round(clampedUiScale * 100)}% / {Math.round(clampedRenderScale * 100)}%
+                                <i className="fas fa-up-down-left-right mr-1.5 text-xs"></i>
+                                {Math.round(clampedUiScale * 100)}%/{Math.round(clampedRenderScale * 100)}%
                             </button>
                             {showScalePanel && (
-                                <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 z-50">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="text-sm font-bold text-white">缩放设置</span>
+                                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-3 z-50">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-white">缩放设置</span>
                                         <button
                                             onClick={() => setShowScalePanel(false)}
                                             className="text-slate-400 hover:text-slate-200"
                                             title="关闭"
                                         >
-                                            <i className="fas fa-xmark"></i>
+                                            <i className="fas fa-xmark text-xs"></i>
                                         </button>
                                     </div>
-                                    <div className="border border-slate-700 rounded-lg p-3 mb-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-xs text-slate-400 font-bold">课件页面缩放</span>
-                                            <span className="text-sm font-mono text-slate-200">{Math.round(clampedUiScale * 100)}%</span>
-                                        </div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-xs text-slate-400">80%</span>
-                                            <span className="text-xs text-slate-400">120%</span>
+                                    <div className="border border-slate-700 rounded-lg p-2.5 mb-2.5">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-xs text-slate-400 font-bold">课件页面</span>
+                                            <span className="text-xs font-mono text-slate-200">{Math.round(clampedUiScale * 100)}%</span>
                                         </div>
                                         <input
                                             type="range"
@@ -805,41 +808,23 @@ window.CourseData = {
                                             onChange={e => setUiScale(Number(e.target.value))}
                                             className="w-full"
                                         />
-                                        <div className="flex justify-end mt-3">
-                                            <button
-                                                onClick={() => setUiScale(1.0)}
-                                                className="text-xs text-blue-400 hover:text-blue-300 font-bold"
-                                            >
-                                                恢复默认
-                                            </button>
+                                    </div>
+                                    <div className="border border-slate-700 rounded-lg p-2.5 mb-2.5">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-xs text-slate-400 font-bold">课件内容</span>
+                                            <span className="text-xs font-mono text-slate-200">{Math.round(clampedRenderScale * 100)}%</span>
                                         </div>
+                                        <input
+                                            type="range"
+                                            min="0.6"
+                                            max="1.2"
+                                            step="0.01"
+                                            value={clampedRenderScale}
+                                            onChange={e => setRenderScale(Number(e.target.value))}
+                                            className="w-full"
+                                        />
                                     </div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs text-slate-400 font-bold">课件内容缩放</span>
-                                        <span className="text-sm font-mono text-slate-200">{Math.round(clampedRenderScale * 100)}%</span>
-                                    </div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs text-slate-400">60%</span>
-                                        <span className="text-xs text-slate-400">120%</span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min="0.6"
-                                        max="1.2"
-                                        step="0.01"
-                                        value={clampedRenderScale}
-                                        onChange={e => setRenderScale(Number(e.target.value))}
-                                        className="w-full"
-                                    />
-                                    <div className="flex justify-end mt-3">
-                                        <button
-                                            onClick={() => setRenderScale(0.96)}
-                                            className="text-xs text-blue-400 hover:text-blue-300 font-bold"
-                                        >
-                                            恢复默认
-                                        </button>
-                                    </div>
-                                    <div className="border-t border-slate-700 mt-4 pt-3">
+                                    <div className="border-t border-slate-700 mt-2 pt-2">
                                         <button
                                             onClick={() => {
                                                 try {
@@ -848,30 +833,33 @@ window.CourseData = {
                                                     }
                                                 } catch (_) {}
                                             }}
-                                            className="w-full py-2 px-3 text-sm font-bold text-slate-100 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-1.5 px-2.5 text-xs font-bold text-slate-100 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                                         >
-                                            <i className="fas fa-bug"></i>
-                                            打开调试面板
+                                            <i className="fas fa-bug text-xs"></i>
+                                            调试面板
                                         </button>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* 导出按钮 */}
-                        <div className="flex items-center">
-                            <button onClick={handleOpenCourse} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm font-bold flex items-center shadow-md mr-2">
-                                <i className="fas fa-folder-open mr-2"></i>打开课件
+                        {/* 分隔线 */}
+                        <div className="w-px h-6 bg-slate-700"></div>
+
+                        {/* 打开/保存按钮 */}
+                        <div className="flex items-center gap-1.5">
+                            <button onClick={handleOpenCourse} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors text-xs font-bold flex items-center shadow-md">
+                                <i className="fas fa-folder-open mr-1.5 text-xs"></i>打开
                             </button>
                             <button
                                 onClick={handleSaveCourse}
                                 disabled={isSaving || !!pdfPreview}
-                                className={`px-4 py-2 rounded-lg transition-colors text-sm font-bold flex items-center shadow-md ${
+                                className={`px-3 py-1.5 rounded transition-colors text-xs font-bold flex items-center shadow-md ${
                                     (isSaving || pdfPreview) ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'
                                 }`}
                             >
-                                <i className={`fas ${isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'} mr-2`}></i>
-                                {isSaving ? '保存中...' : (pdfPreview ? '仅预览' : '保存课件')}
+                                <i className={`fas ${isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'} mr-1.5 text-xs`}></i>
+                                {isSaving ? '保存中' : '保存'}
                             </button>
                         </div>
 
@@ -949,9 +937,9 @@ window.CourseData = {
 
             {/* 右侧 AI 聊天面板 */}
             <div className="w-96 shrink-0 h-full flex flex-col border-l border-slate-700 bg-slate-800 shadow-xl relative z-20">
-                <AIChat 
+                <AIChat
                     ref={aiChatRef}
-                    onCodeGenerated={handleAIGeneratedCode} 
+                    onCodeGenerated={handleAIGeneratedCode}
                     onGeneratingStatusChange={setIsAIGenerating}
                     currentCode={code}
                     compileError={compileError}

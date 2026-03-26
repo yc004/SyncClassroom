@@ -69,4 +69,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on(`ai-chat-error-${requestId}`, listener);
         return () => ipcRenderer.removeListener(`ai-chat-error-${requestId}`, listener);
     },
+    // 知识库功能
+    loadKnowledgeBase: () => ipcRenderer.invoke('load-knowledge-base'),
+    saveKnowledgeBase: (items) => ipcRenderer.invoke('save-knowledge-base', items),
 });
