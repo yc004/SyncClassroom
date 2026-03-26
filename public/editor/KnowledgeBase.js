@@ -14,6 +14,8 @@
     const [showUploadPanel, setShowUploadPanel] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [viewingItem, setViewingItem] = useState(null);
+    const [selectedItems, setSelectedItems] = useState(new Set());
+    const [batchMode, setBatchMode] = useState(false);
     const fileInputRef = React.useRef(null);
 
     // 从统一的知识库文件加载内置知识（通过 window.builtinKnowledgeBase）
@@ -85,7 +87,7 @@
                 // 过滤掉内置知识，只保存用户知识
                 const userKnowledge = items.filter(item => !item.isBuiltin);
                 await window.electronAPI.saveKnowledgeBase(userKnowledge);
-                const allKnowledge = [...builtinKnowledge, ...userKnowledge];
+                const allKnowledge = [...loadBuiltinKnowledge(), ...userKnowledge];
                 setKnowledgeItems(allKnowledge);
                 filterItems(allKnowledge);
             }
@@ -206,86 +208,131 @@
         );
     };
 
-    // 处理文件上传
-    const handleFileUpload = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
+    // 切换批量选择模式
+    const toggleBatchMode = () => {
+        setBatchMode(!batchMode);
+        setSelectedItems(new Set());
+    };
 
-        // 检查文件大小（最大 5MB）
-        if (file.size > 5 * 1024 * 1024) {
-            alert('文件过大，请上传小于 5MB 的文件');
+    // 切换选中状态
+    const toggleItemSelection = (itemId) => {
+        setSelectedItems(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(itemId)) {
+                newSet.delete(itemId);
+            } else {
+                newSet.add(itemId);
+            }
+            return newSet;
+        });
+    };
+
+    // 全选/取消全选
+    const toggleSelectAll = () => {
+        const userItems = filteredItems.filter(item => !item.isBuiltin);
+        if (selectedItems.size === userItems.length) {
+            setSelectedItems(new Set());
+        } else {
+            setSelectedItems(new Set(userItems.map(item => item.id)));
+        }
+    };
+
+    // 批量删除选中项
+    const handleBatchDelete = () => {
+        if (selectedItems.size === 0) {
+            alert('请先选择要删除的知识项');
             return;
         }
 
+        if (!confirm(`确定要删除选中的 ${selectedItems.size} 条知识吗？`)) return;
+
+        const updatedItems = knowledgeItems.filter(item => !selectedItems.has(item.id));
+        saveKnowledge(updatedItems);
+        setSelectedItems(new Set());
+        setBatchMode(false);
+    };
+
+    // 处理文件上传（使用知识处理器）
+    const handleFileUpload = async (event) => {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+
+        // 检查文件大小（最大 10MB）
+        for (const file of files) {
+            if (file.size > 10 * 1024 * 1024) {
+                alert(`文件 ${file.name} 过大，请上传小于 10MB 的文件`);
+                return;
+            }
+        }
+
         // 检查文件类型
-        const validTypes = ['text/plain', 'text/markdown', 'application/json', 'text/javascript'];
-        if (!validTypes.includes(file.type) && !file.name.endsWith('.md') && !file.name.endsWith('.json')) {
-            alert('仅支持上传文本文件、Markdown、JSON 等格式');
-            return;
+        const validExtensions = ['.txt', '.md', '.markdown', '.json'];
+        for (const file of files) {
+            const extension = '.' + file.name.split('.').pop().toLowerCase();
+            if (!validExtensions.includes(extension)) {
+                alert(`文件 ${file.name} 格式不支持，仅支持上传文本文件、Markdown、JSON 等格式`);
+                return;
+            }
         }
 
         setUploading(true);
 
         try {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const content = e.target.result;
+            // 确保知识处理器已加载
+            let ProcessorClass = window.KnowledgeProcessor;
+            if (!ProcessorClass) {
+                console.log('[知识库] 动态加载知识处理器...');
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'knowledge/processor.js';
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                ProcessorClass = window.KnowledgeProcessor;
+            }
 
-                // 根据文件类型解析内容
-                let title = '';
-                let category = '未分类';
-                let parsedContent = content;
+            if (typeof ProcessorClass !== 'function') {
+                throw new Error('知识处理器加载失败');
+            }
 
-                if (file.name.endsWith('.json')) {
-                    try {
-                        const jsonData = JSON.parse(content);
-                        title = jsonData.title || file.name;
-                        category = jsonData.category || '未分类';
-                        parsedContent = jsonData.content || content;
-                    } catch (err) {
-                        title = file.name.replace('.json', '');
-                    }
-                } else {
-                    // 从内容中提取标题（如果是 Markdown）
-                    const titleMatch = content.match(/^#\s+(.+)$/m);
-                    if (titleMatch) {
-                        title = titleMatch[1].trim();
-                        parsedContent = content.replace(/^#\s+.+$/m, '').trim();
-                    } else {
-                        title = file.name.replace(/\.[^/.]+$/, '');
-                    }
-                }
+            const processor = new ProcessorClass();
 
-                const newItem = {
-                    id: Date.now().toString(),
-                    title: title,
-                    category: category,
-                    content: parsedContent,
-                    source: 'file',
-                    fileName: file.name,
-                    updatedAt: new Date().toISOString()
-                };
+            // 处理文件
+            const result = await processor.processMultipleFiles(files, {
+                chunkSize: 800,
+                chunkOverlap: 100,
+                defaultCategory: '自定义',
+                defaultTags: []
+            });
 
-                const updatedItems = [...knowledgeItems, newItem];
-                saveKnowledge(updatedItems);
-                setShowUploadPanel(false);
-                setUploading(false);
-                alert(`文件 "${file.name}" 上传成功！`);
-            };
+            if (result.errors.length > 0) {
+                console.warn('[知识库] 部分文件处理失败:', result.errors);
+                const errorMessages = result.errors.map(e => `- ${e.file}: ${e.error}`).join('\n');
+                alert(`部分文件处理成功，但以下文件失败：\n${errorMessages}`);
+            }
 
-            reader.onerror = () => {
-                setUploading(false);
-                alert('文件读取失败');
-            };
+            if (result.chunks.length === 0) {
+                throw new Error('没有成功的知识块');
+            }
 
-            reader.readAsText(file, 'utf-8');
+            // 合并到现有知识库
+            const updatedItems = [...knowledgeItems, ...result.chunks];
+            saveKnowledge(updatedItems);
+
+            console.log(`[知识库] 成功导入 ${result.chunks.length} 个知识块`);
+            alert(`成功导入 ${result.chunks.length} 个知识块${result.errors.length > 0 ? `（${result.errors.length} 个文件失败）` : ''}`);
+
         } catch (error) {
+            console.error('[知识库] 文件处理失败:', error);
+            alert('文件处理失败: ' + error.message);
+        } finally {
             setUploading(false);
-            alert('上传失败: ' + error.message);
+            // 重置文件输入
+            if (event.target) {
+                event.target.value = '';
+            }
         }
-
-        // 重置 input
-        event.target.value = '';
     };
 
     // 格式化时间
@@ -320,7 +367,7 @@
             {/* 知识库主面板 */}
             {show && (
                 <div className="fixed inset-0 z-50 bg-slate-900/90 flex items-center justify-center p-4">
-                    <div className="bg-slate-800 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-slate-700 shadow-2xl">
+                    <div className="bg-slate-800 rounded-2xl w-[1200px] h-[700px] flex flex-col border border-slate-700 shadow-2xl flex-shrink-0 overflow-hidden">
                         {/* 标题栏 */}
                         <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800">
                             <div className="flex items-center gap-3">
@@ -388,19 +435,42 @@
                                 {/* 知识操作按钮 */}
                                 <div className="space-y-2 mt-4">
                                     <button
-                                        onClick={() => openEditor()}
-                                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-bold flex items-center justify-center gap-2"
-                                    >
-                                        <i className="fas fa-plus"></i>
-                                        添加知识
-                                    </button>
-                                    <button
                                         onClick={() => setShowUploadPanel(true)}
                                         className="w-full px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm font-bold flex items-center justify-center gap-2"
                                     >
                                         <i className="fas fa-upload"></i>
                                         上传文件
                                     </button>
+                                    <button
+                                        onClick={toggleBatchMode}
+                                        className={`w-full px-4 py-2 transition-colors text-sm font-bold flex items-center justify-center gap-2 ${
+                                            batchMode
+                                                ? 'bg-orange-600 hover:bg-orange-500 text-white'
+                                                : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                                        }`}
+                                    >
+                                        <i className="fas fa-tasks"></i>
+                                        {batchMode ? '退出批量模式' : '批量管理'}
+                                    </button>
+                                    {batchMode && (
+                                        <div className="space-y-2 pt-2 border-t border-slate-700">
+                                            <button
+                                                onClick={toggleSelectAll}
+                                                className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <i className="fas fa-check-double"></i>
+                                                全选/取消
+                                            </button>
+                                            <button
+                                                onClick={handleBatchDelete}
+                                                disabled={selectedItems.size === 0}
+                                                className="w-full px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-bold flex items-center justify-center gap-2"
+                                            >
+                                                <i className="fas fa-trash-alt"></i>
+                                                删除选中 ({selectedItems.size})
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -422,11 +492,26 @@
                                         {filteredItems.map(item => (
                                             <div
                                                 key={item.id}
-                                                className="bg-slate-900 border border-slate-700 rounded-xl p-4 hover:border-blue-500/50 transition-all"
+                                                className={`bg-slate-900 border rounded-xl p-4 transition-all ${
+                                                    batchMode
+                                                        ? selectedItems.has(item.id)
+                                                            ? 'border-orange-500 bg-orange-900/10'
+                                                            : 'border-slate-700'
+                                                        : 'border-slate-700 hover:border-blue-500/50'
+                                                }`}
                                             >
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="flex-1 cursor-pointer" onClick={() => setViewingItem(item)}>
                                                         <div className="flex items-center gap-2 mb-2">
+                                                            {batchMode && !item.isBuiltin && (
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedItems.has(item.id)}
+                                                                    onChange={() => toggleItemSelection(item.id)}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-orange-500 focus:ring-orange-500"
+                                                                />
+                                                            )}
                                                             <h3 className="font-bold text-white hover:text-blue-400 transition-colors">{item.title}</h3>
                                                             {item.isBuiltin && (
                                                                 <span className="px-2 py-0.5 bg-amber-600/20 text-amber-400 text-xs rounded-full font-bold">
@@ -465,17 +550,14 @@
                                                             <i className="fas fa-eye"></i>
                                                             点击查看完整内容
                                                         </p>
-                                                        <div className="flex items-center gap-3 mt-2">
-                                                            <p className="text-xs text-slate-500">
-                                                                {formatDate(item.updatedAt)}
-                                                            </p>
-                                                            {item.fileName && (
+                                                        {item.fileName && (
+                                                            <div className="flex items-center gap-3 mt-2">
                                                                 <p className="text-xs text-green-400">
                                                                     <i className="fas fa-file-alt mr-1"></i>
                                                                     {item.fileName}
                                                                 </p>
-                                                            )}
-                                                        </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         {!item.isBuiltin && (
@@ -702,7 +784,8 @@
                                         <input
                                             ref={fileInputRef}
                                             type="file"
-                                            accept=".txt,.md,.json,.js,.ts,.jsx,.tsx"
+                                            multiple
+                                            accept=".txt,.md,.markdown,.json,.js,.ts,.jsx,.tsx"
                                             onChange={handleFileUpload}
                                             className="hidden"
                                         />
@@ -712,7 +795,7 @@
                                             </div>
                                             <div>
                                                 <h3 className="text-white font-bold mb-2">点击或拖拽文件到此处上传</h3>
-                                                <p className="text-slate-400 text-sm">支持 TXT、Markdown、JSON、JS、TS 等格式，最大 5MB</p>
+                                                <p className="text-slate-400 text-sm">支持 TXT、Markdown、JSON、JS、TS 等格式，最大 10MB，支持多文件</p>
                                             </div>
                                             <button
                                                 onClick={() => fileInputRef.current?.click()}
@@ -720,18 +803,25 @@
                                                 className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-bold flex items-center gap-2"
                                             >
                                                 <i className={`fas ${uploading ? 'fa-spinner fa-spin' : 'fa-folder-open'}`}></i>
-                                                {uploading ? '上传中...' : '选择文件'}
+                                                {uploading ? '处理中...' : '选择文件'}
                                             </button>
                                         </div>
                                     </div>
 
+
                                     <div className="mt-4 p-3 bg-slate-900 rounded-lg">
                                         <h4 className="text-xs font-bold text-slate-400 mb-2">支持的文件格式：</h4>
                                         <ul className="text-xs text-slate-300 space-y-1">
-                                            <li>• <strong>JSON：</strong>格式为 {`{ "title": "标题", "category": "分类", "content": "内容" }`}</li>
-                                            <li>• <strong>Markdown：</strong>第一行 # 标题会自动识别</li>
-                                            <li>• <strong>TXT：</strong>使用文件名作为标题</li>
+                                            <li>• <strong>JSON：</strong>自动解析为知识条目或知识条目数组</li>
+                                            <li>• <strong>Markdown：</strong>按标题层级自动切分为多个知识块</li>
+                                            <li>• <strong>TXT：</strong>按段落自动切分为知识块（每块约800字）</li>
                                         </ul>
+                                        <div className="mt-2 p-2 bg-blue-600/10 border border-blue-600/30 rounded">
+                                            <p className="text-xs text-blue-400">
+                                                <i className="fas fa-info-circle mr-1"></i>
+                                                自动切分：长文档会按段落和句子边界自动分割为多个知识块
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
 

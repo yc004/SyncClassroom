@@ -12,6 +12,7 @@
 - [教师交互同步](#教师交互同步)
 - [工具函数](#工具函数)
 - [课件事件](#课件事件)
+- [RAG 知识库](#rag-知识库)
 - [完整示例](#完整示例)
 
 ---
@@ -1436,9 +1437,153 @@ useEffect(() => {
 
 ---
 
+## RAG 知识库
+
+萤火课件编辑器内置了 RAG（Retrieval-Augmented Generation）知识库系统，为 AI 生成课件提供专业的教学知识和编程指导。
+
+### 知识库全局对象
+
+#### window.builtinKnowledgeBase
+
+内置知识库数组，包含所有预置的知识条目。
+
+```tsx
+console.log('知识库总数:', window.builtinKnowledgeBase.length);
+```
+
+#### window.retrieveKnowledge(query, topK, category)
+
+RAG 智能检索函数，根据查询返回最相关的知识块。
+
+**参数：**
+- `query` (string): 用户查询关键词
+- `topK` (number): 返回前 K 个结果，默认 3
+- `category` (string): 可选，按分类过滤
+
+**返回：** 知识条目数组
+
+**示例：**
+```tsx
+// 检索关于"选择题"的知识
+const quizKnowledge = window.retrieveKnowledge('选择题', 3);
+console.log('相关知识:', quizKnowledge);
+
+// 按分类检索
+const apiDocs = window.retrieveKnowledge('同步变量', 5, '系统API');
+```
+
+#### window.getKnowledgeByCategory(category)
+
+获取指定分类下的所有知识。
+
+**参数：**
+- `category` (string): 分类名称
+
+**返回：** 该分类下的所有知识数组
+
+**示例：**
+```tsx
+const teachingStrategies = window.getKnowledgeByCategory('教学策略');
+console.log('教学策略数量:', teachingStrategies.length);
+```
+
+#### window.getAllCategories()
+
+获取所有可用分类。
+
+**返回：** 分类名称数组
+
+**示例：**
+```tsx
+const categories = window.getAllCategories();
+console.log('所有分类:', categories);
+// 输出: ["系统API", "互动组件", "教学策略", "动画效果", ...]
+```
+
+#### window.reloadKnowledgeBase(options)
+
+重新加载知识库。
+
+**参数：**
+- `options` (object): 配置选项
+  - `force` (boolean): 是否强制重新加载，默认 false
+
+**示例：**
+```tsx
+// 重新加载知识库
+window.reloadKnowledgeBase({ force: true });
+```
+
+### 知识库分类
+
+编辑器内置以下知识分类：
+
+| 分类 | 说明 | 适用场景 |
+|------|------|----------|
+| 系统API | 萤火课件系统的API和接口 | 使用 useSyncVar、摄像头、提交功能等 |
+| 互动组件 | 选择题、填空题、拖拽等交互组件 | 创建互动课件 |
+| 教学策略 | 不同年龄段教学策略、设计原则 | 根据学生特点设计课件 |
+| 动画效果 | CSS 动画和过渡效果 | 添加动画效果 |
+| 样式系统 | Tailwind CSS 使用指南 | 页面样式设计 |
+| 状态管理 | React Hooks 状态管理 | 组件状态管理 |
+| 多媒体 | 图片、视频等媒体处理 | 添加媒体内容 |
+| 最佳实践 | 性能优化和代码规范 | 提高课件质量 |
+
+### 在课件中使用知识库
+
+虽然知识库主要供 AI 编辑器使用，但开发者也可以在课件中访问：
+
+```tsx
+function KnowledgeSlide() {
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const handleSearch = () => {
+        // 检索相关知识
+        const results = window.retrieveKnowledge(searchQuery, 5);
+        console.log('检索结果:', results);
+    };
+
+    return (
+        <div className="p-8">
+            <h2>知识库检索</h2>
+            <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="输入关键词..."
+                className="px-4 py-2 border rounded"
+            />
+            <button onClick={handleSearch} className="ml-2 px-4 py-2 bg-blue-500 text-white rounded">
+                搜索
+            </button>
+
+            <div className="mt-4">
+                <h3>所有分类:</h3>
+                <ul>
+                    {window.getAllCategories().map(cat => (
+                        <li key={cat}>{cat}</li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    );
+}
+```
+
+### 注意事项
+
+1. **只读访问**：知识库在课件运行时为只读，不能修改内置知识
+2. **性能考虑**：频繁检索可能影响性能，建议缓存结果
+3. **编辑器专用**：知识库功能主要在 AI 编辑器中使用，普通课件中不常需要
+
+详细文档请参考：[知识库系统指南](./knowledge-base-guide.md)
+
+---
+
 ## 技术支持
 
 如有问题，请查看：
 - [课件开发模板](./course-template.md)
 - [日志系统文档](./LOGGING.md)
+- [知识库系统指南](./knowledge-base-guide.md)
 - 在教师端控制台查看浏览器控制台日志

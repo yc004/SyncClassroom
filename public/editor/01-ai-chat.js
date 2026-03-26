@@ -48,13 +48,13 @@ const AIChat = React.forwardRef(({ onCodeGenerated, onGeneratingStatusChange, cu
             let userData = [];
             if (window.electronAPI?.loadKnowledgeBase) {
                 userData = await window.electronAPI.loadKnowledgeBase();
-                console.log('[RAG] 用户知识已加载:', userData.length, '条');
+                // console.log('[RAG] 用户知识已加载:', userData.length, '条');
             }
 
             // 合并内置知识和用户知识
             const allKnowledge = [...builtinData, ...(userData || [])];
             setKnowledgeItems(allKnowledge);
-            console.log('[RAG] 知识库总计:', allKnowledge.length, '条');
+            // console.log('[RAG] 知识库总计:', allKnowledge.length, '条');
         } catch (error) {
             console.error('[RAG] 加载知识库失败:', error);
             // 如果加载失败，尝试至少加载内置知识
@@ -101,10 +101,10 @@ const AIChat = React.forwardRef(({ onCodeGenerated, onGeneratingStatusChange, cu
 
     // RAG决策：判断是否需要查询知识库
     const shouldRetrieveKnowledge = async (userQuery) => {
-        console.log('[RAG] 开始检索, 知识库条目数:', knowledgeItems.length, '用户查询:', userQuery);
+        // console.log('[RAG] 开始检索, 知识库条目数:', knowledgeItems.length, '用户查询:', userQuery);
 
         if (!userQuery || !knowledgeItems.length) {
-            console.log('[RAG] 检索失败: 缺少查询或知识库为空');
+            // console.log('[RAG] 检索失败: 缺少查询或知识库为空');
             return { shouldRetrieve: false, relevantItems: [] };
         }
 

@@ -31,6 +31,9 @@
 - 流式实时预览：生成过程中预览区同步更新，固定 16:9 比例
 - 源码编辑体验：行号显示、滚动同步，便于精细化调整
 - 一键修复：课件编译错误可一键将错误信息回传给 AI 自动修复
+- **RAG 知识库**：内置教学知识库，支持按分类管理（系统API、互动组件、教学策略、动画效果等），AI 自动检索相关知识生成课件
+- **文件导入**：支持导入 TXT、Markdown、JSON 文件，自动切分为知识块
+- **批量管理**：支持批量选择和删除自定义知识
 
 ## 快速开始（开发模式）
 
@@ -99,6 +102,18 @@ npm run build:editor
 - API 文档：[docs/API.md](docs/API.md)
 - 机房视图：[docs/classroom-view-guide.md](docs/classroom-view-guide.md)
 
+### RAG 知识库系统
+
+编辑器内置智能知识库，支持以下功能：
+
+- **分类管理**：知识按分类存储（系统API、互动组件、教学策略、动画效果、样式系统、状态管理、多媒体、最佳实践）
+- **智能检索**：基于关键词匹配和相似度计算，自动检索相关知识
+- **文件导入**：支持导入 TXT、Markdown、JSON 文件，自动切分为知识块
+- **批量操作**：支持批量选择和删除自定义知识
+- **内置知识**：预置 21 条内置知识，涵盖 API 使用、教学策略、最佳实践等
+
+知识库位置：`public/knowledge/categories/`，按分类文件管理，方便扩展和更新。
+
 ### 基本示例
 
 ```tsx
@@ -133,6 +148,13 @@ window.CourseData = {
 - [docs/用户说明-学生端.md](./docs/用户说明-学生端.md)
 - [docs/用户说明-AI课件编辑器.md](./docs/用户说明-AI课件编辑器.md)
 
+## 开发者文档
+
+- [docs/API.md](./docs/API.md) - 课件 API 完整文档
+- [docs/interaction-sync-guide.md](./docs/interaction-sync-guide.md) - 交互同步系统
+- [docs/knowledge-base-guide.md](./docs/knowledge-base-guide.md) - 知识库系统
+- [public/knowledge/categories/README.md](./public/knowledge/categories/README.md) - 知识库管理说明
+
 ## 项目结构
 
 ```
@@ -155,7 +177,19 @@ SyncClassroom/
 │   ├── editor/                        # 编辑器前端代码
 │   ├── courses/                       # 课件目录（.lume 为主，兼容 .tsx/.js 等）
 │   ├── lib/                           # 第三方库缓存目录
-│   └── weights/                       # AI 模型权重缓存目录
+│   ├── weights/                       # AI 模型权重缓存目录
+│   └── knowledge/                     # RAG 知识库
+│       ├── index.js                   # 知识库主索引
+│       ├── processor.js               # 知识处理器（文件导入）
+│       └── categories/                # 知识分类目录
+│           ├── system-api.js         # 系统API
+│           ├── interactive-components.js  # 互动组件
+│           ├── teaching-strategies.js     # 教学策略
+│           ├── animations.js         # 动画效果
+│           ├── styling.js            # 样式系统
+│           ├── state-management.js   # 状态管理
+│           ├── multimedia.js         # 多媒体
+│           └── best-practices.js     # 最佳实践
 ├── electron/
 │   ├── main-teacher.js                # 教师端主进程
 │   ├── main-student.js                # 学生端主进程
