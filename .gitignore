@@ -9,3 +9,5 @@ dist
 .vscode
 webfonts
 file
+.env
+downloads/
