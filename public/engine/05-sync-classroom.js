@@ -98,7 +98,9 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
     });
     const [showVoteResultPanel, setShowVoteResultPanel] = useState(false);
 
-    const [annotateMenuOpen, setAnnotateMenuOpen] = useState(false);
+    const [annoPopupType, setAnnoPopupType] = useState(null);
+
+
     const [annoTool, setAnnoTool] = useState('pen'); // pen | marker | highlighter | eraser
     const [annoWidth, setAnnoWidth] = useState(4);
     const [annoColor, setAnnoColor] = useState('#ef4444');
