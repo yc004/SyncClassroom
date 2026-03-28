@@ -8,6 +8,8 @@ function SubmissionsBrowser({ courses, selectedCourseId: initialCourseId, onClos
     const [loading, setLoading] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewContent, setPreviewContent] = useState(null);
+    const [selectedFiles, setSelectedFiles] = useState(new Set());
+    const [downloading, setDownloading] = useState(false);
 
     // 获取课程列表（扁平化）
     const courseList = Array.isArray(courses) ? courses : (courses?.courses || []);
@@ -88,6 +90,61 @@ function SubmissionsBrowser({ courses, selectedCourseId: initialCourseId, onClos
             'pdf': { icon: 'fa-file-pdf', color: 'text-red-500', bg: 'bg-red-50' },
         };
         return icons[ext] || { icon: 'fa-file', color: 'text-slate-500', bg: 'bg-slate-50' };
+    };
+
+    const handleFileSelect = (fileName, checked) => {
+        const newSelected = new Set(selectedFiles);
+        if (checked) {
+            newSelected.add(fileName);
+        } else {
+            newSelected.delete(fileName);
+        }
+        setSelectedFiles(newSelected);
+    };
+
+    const handleSelectAll = (checked) => {
+        if (checked) {
+            setSelectedFiles(new Set(files.map(f => f.name)));
+        } else {
+            setSelectedFiles(new Set());
+        }
+    };
+
+    const handleBatchDownload = async () => {
+        if (selectedFiles.size === 0) {
+            alert('请先选择要下载的文件');
+            return;
+        }
+
+        setDownloading(true);
+        try {
+            const response = await fetch(`/api/submissions/${encodeURIComponent(selectedCourseId)}/download-batch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ files: Array.from(selectedFiles) })
+            });
+
+            if (!response.ok) {
+                throw new Error('下载失败');
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${selectedCourseId}_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('[batchDownload] Error:', err);
+            alert('批量下载失败');
+        } finally {
+            setDownloading(false);
+        }
     };
 
     // 解析文件路径，提取班级和日期信息
@@ -302,27 +359,55 @@ function SubmissionsBrowser({ courses, selectedCourseId: initialCourseId, onClos
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* 工具栏 */}
                     <div className="flex items-center justify-between px-4 py-2 bg-slate-800/30 border-b border-slate-700 shrink-0">
-                        <div className="text-sm text-slate-400">
+                        <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={files.length > 0 && selectedFiles.size === files.length}
+                                    onChange={(e) => handleSelectAll(e.target.checked)}
+                                    disabled={files.length === 0}
+                                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-900"
+                                />
+                                <span>全选</span>
+                            </label>
                             {selectedCourseId ? (
                                 <span>
                                     <span className="font-bold text-slate-300">{courseList.find(c => c.id === selectedCourseId)?.title}</span>
                                     <span className="mx-2">·</span>
                                     <span>共 {files.length} 个文件</span>
+                                    {selectedFiles.size > 0 && (
+                                        <>
+                                            <span className="mx-2">·</span>
+                                            <span>已选 {selectedFiles.size} 个</span>
+                                        </>
+                                    )}
                                 </span>
                             ) : (
                                 <span className="text-slate-500">请选择一个课程</span>
                             )}
                         </div>
-                        {selectedCourseId && (
-                            <button
-                                onClick={loadSubmissions}
-                                disabled={loading}
-                                className="flex items-center px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-xs transition-colors"
-                            >
-                                <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-sync-alt'} mr-1.5`}></i>
-                                刷新
-                            </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {selectedCourseId && selectedFiles.size > 0 && (
+                                <button
+                                    onClick={handleBatchDownload}
+                                    disabled={downloading}
+                                    className="flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <i className={`fas ${downloading ? 'fa-spinner fa-spin' : 'fa-download'} mr-1.5`}></i>
+                                    批量下载 ({selectedFiles.size})
+                                </button>
+                            )}
+                            {selectedCourseId && (
+                                <button
+                                    onClick={loadSubmissions}
+                                    disabled={loading}
+                                    className="flex items-center px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-xs transition-colors"
+                                >
+                                    <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-sync-alt'} mr-1.5`}></i>
+                                    刷新
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* 文件列表 */}
@@ -353,12 +438,27 @@ function SubmissionsBrowser({ courses, selectedCourseId: initialCourseId, onClos
                                 {files.map((file, idx) => {
                                     const fileIcon = getFileIcon(file.name);
                                     const { classroom, date, fileName } = parseFileInfo(file.name);
+                                    const isSelected = selectedFiles.has(file.name);
                                     return (
                                         <div
                                             key={idx}
-                                            className="flex items-center p-3 rounded-lg bg-slate-800/30 border border-slate-700 hover:bg-slate-800 hover:border-slate-600 transition-all cursor-pointer group"
+                                            className={`flex items-center p-3 rounded-lg border transition-all cursor-pointer group ${
+                                                isSelected
+                                                    ? 'bg-green-500/10 border-green-500/50'
+                                                    : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800 hover:border-slate-600'
+                                            }`}
                                             onClick={() => handlePreviewFile(file)}
                                         >
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={(e) => {
+                                                    e.stopPropagation();
+                                                    handleFileSelect(file.name, e.target.checked);
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-900 shrink-0 mr-3"
+                                            />
                                             <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center shrink-0 mr-3`}>
                                                 <i className={`fas ${fileIcon.icon} ${fileIcon.color} text-lg`}></i>
                                             </div>

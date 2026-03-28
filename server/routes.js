@@ -352,6 +352,61 @@ router.get('/submissions/:courseId/file/:fileName(*)', (req, res) => {
     }
 });
 
+// 批量打包下载学生提交文件
+router.post('/submissions/:courseId/download-batch', async (req, res) => {
+    const { courseId } = req.params;
+    const { files } = req.body;
+
+    if (!courseId || !Array.isArray(files) || files.length === 0) {
+        return res.status(400).json({ success: false, error: 'Missing required parameters or no files selected' });
+    }
+
+    try {
+        const archiver = require('archiver');
+        const submissionsDir = getSubmissionsDir();
+        const courseDir = path.join(submissionsDir, courseId);
+
+        // 设置响应头
+        const timestamp = new Date().toISOString().split('T')[0];
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${courseId}_${timestamp}.zip"`);
+
+        // 创建归档
+        const archive = archiver('zip', {
+            zlib: { level: 9 }
+        });
+
+        // 处理错误
+        archive.on('error', (err) => {
+            console.error('[batch-download] Archive error:', err);
+            res.status(500).json({ success: false, error: err.message });
+        });
+
+        // 将归档输出到响应流
+        archive.pipe(res);
+
+        // 添加选中的文件
+        let addedCount = 0;
+        for (const fileName of files) {
+            const filePath = path.join(courseDir, fileName);
+            if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                archive.file(filePath, { name: fileName });
+                addedCount++;
+            }
+        }
+
+        console.log(`[batch-download] Adding ${addedCount} files to archive for course ${courseId}`);
+
+        // 完成归档
+        await archive.finalize();
+    } catch (err) {
+        console.error('[batch-download] Error:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: err.message });
+        }
+    }
+});
+
 // ========================================================
 // 文档和教程 API
 // ========================================================
