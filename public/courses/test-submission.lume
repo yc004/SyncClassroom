@@ -199,11 +199,7 @@ function QuickSubmitSlide() {
         try {
             // 调用提交 API - 合并到CSV文件
             await window.CourseGlobalContext.submitContent({
-                content: {
-                    type: 'quick-note',
-                    message: text,
-                    timestamp: new Date().toISOString()
-                },
+                content: text,
                 fileName: 'quick-notes.csv',
                 mergeFile: true
             });
