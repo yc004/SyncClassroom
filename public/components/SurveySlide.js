@@ -2,14 +2,41 @@
 // 问卷通用组件 - SurveySlide
 // ========================================================
 
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useCallback } = React;
 
 /**
- * 问卷组件
- * 支持单选、多选、文本、评分、排序五种题型
- * 自动提交数据到教师端，合并为 CSV 文件
+ * 问卷组件 - 简化版
+ * 用户只需提供题目配置，引擎自动处理：
+ * - 自动生成唯一 ID
+ * - 自动格式化提交数据
+ * - 自动提交到教师端
+ * - 自动合并为 CSV
+ * - 自动保存草稿
+ * - 自动验证必填项
  */
 function SurveySlide({ config }) {
+    // 自动生成问卷 ID（如果未提供）
+    const surveyId = config.id || `survey_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    // 自动为问题生成 ID（如果未提供）
+    const questions = config.questions.map((q, index) => ({
+        ...q,
+        id: q.id || `q${index + 1}`
+    }));
+
+    // 构建完整的配置（自动填充默认值）
+    const fullConfig = {
+        id: surveyId,
+        title: config.title || '问卷',
+        description: config.description || '',
+        required: config.required !== false, // 默认 true
+        showProgress: config.showProgress !== false, // 默认 true
+        theme: config.theme || { primary: 'blue', background: 'slate-50' },
+        questions,
+        submitButtonText: config.submitButtonText || '提交问卷',
+        successMessage: config.successMessage || '提交成功！感谢您的反馈。',
+        errorMessage: config.errorMessage || '提交失败，请重试'
+    };
     // 答案状态
     const [answers, setAnswers] = useState({});
     const [draft, setDraft] = useState(null);
@@ -21,7 +48,7 @@ function SurveySlide({ config }) {
     useEffect(() => {
         const loadDraft = () => {
             try {
-                const draftStr = localStorage.getItem(`survey-draft-${config.id}`);
+                const draftStr = localStorage.getItem(`survey-draft-${surveyId}`);
                 if (draftStr) {
                     const savedDraft = JSON.parse(draftStr);
                     setDraft(savedDraft);
@@ -40,7 +67,7 @@ function SurveySlide({ config }) {
         }, 30000);
 
         return () => clearInterval(autoSaveInterval);
-    }, [config.id]);
+    }, [surveyId]);
 
     // 保存草稿到本地存储
     const saveDraft = useCallback(() => {
@@ -49,22 +76,22 @@ function SurveySlide({ config }) {
                 timestamp: Date.now(),
                 answers
             };
-            localStorage.setItem(`survey-draft-${config.id}`, JSON.stringify(draftData));
+            localStorage.setItem(`survey-draft-${surveyId}`, JSON.stringify(draftData));
             setDraft(draftData);
         } catch (e) {
             console.error('保存草稿失败:', e);
         }
-    }, [config.id, answers]);
+    }, [surveyId, answers]);
 
     // 清除草稿
     const clearDraft = useCallback(() => {
         try {
-            localStorage.removeItem(`survey-draft-${config.id}`);
+            localStorage.removeItem(`survey-draft-${surveyId}`);
             setDraft(null);
         } catch (e) {
             console.error('清除草稿失败:', e);
         }
-    }, [config.id]);
+    }, [surveyId]);
 
     // 更新答案
     const handleAnswerChange = useCallback((questionId, value) => {
@@ -85,8 +112,8 @@ function SurveySlide({ config }) {
     // 验证答案
     const validateAnswers = () => {
         const newErrors = {};
-        
-        config.questions.forEach(q => {
+
+        fullConfig.questions.forEach(q => {
             if (q.required && !answers[q.id]) {
                 newErrors[q.id] = '此题为必填项';
             }
@@ -96,7 +123,7 @@ function SurveySlide({ config }) {
         return Object.keys(newErrors).length === 0;
     };
 
-    // 提交问卷
+    // 提交问卷（引擎自动处理所有细节）
     const handleSubmit = useCallback(async () => {
         if (!validateAnswers()) {
             alert('请填写所有必填项');
@@ -107,58 +134,50 @@ function SurveySlide({ config }) {
         setSubmitStatus(null);
 
         try {
-            // 准备提交数据
+            // 引擎自动准备提交数据
             const submission = {
                 timestamp: Date.now(),
-                surveyId: config.id,
+                surveyId,
                 answers,
                 status: 'submitted'
             };
 
-            console.log('[SurveySlide] Submission data:', submission);
+            console.log('[SurveySlide] 提交数据:', submission);
 
-            // 生成表头
-            const header = generateCSVHeader(config.questions);
+            // 引擎自动生成 CSV 格式
+            const header = generateCSVHeader(fullConfig.questions);
+            const csvRow = formatSubmissionAsCSV(submission, fullConfig.questions);
 
-            // 格式化为 CSV 行
-            const csvRow = formatSubmissionAsCSV(submission, config.questions);
-            console.log('[SurveySlide] CSV row:', csvRow);
-
-            // 提交到教师端（包含表头和数据行）
+            // 引擎自动提交到教师端
             await window.CourseGlobalContext.submitContent({
                 content: {
                     header,
                     row: csvRow
                 },
-                fileName: `${config.id.replace(/:/g, '_')}.csv`,
+                fileName: `${surveyId.replace(/:/g, '_')}.csv`,
                 mergeFile: true
             });
 
             // 提交成功
             setSubmitStatus('success');
             clearDraft();
-            alert('提交成功！感谢您的反馈。');
+            alert(fullConfig.successMessage);
 
         } catch (error) {
             console.error('提交失败:', error);
-            console.error('错误详情:', {
-                message: error.message,
-                stack: error.stack,
-                error
-            });
             setSubmitStatus('error');
-            alert(`提交失败：${error.message}`);
+            alert(`${fullConfig.errorMessage}：${error.message}`);
         } finally {
             setIsSubmitting(false);
         }
-    }, [config, answers, clearDraft]);
+    }, [fullConfig, surveyId, answers, clearDraft]);
 
     // 获取已完成的题目数量
-    const completedCount = config.questions.filter(q => answers[q.id]).length;
-    const progress = config.showProgress ? Math.round((completedCount / config.questions.length) * 100) : null;
+    const completedCount = fullConfig.questions.filter(q => answers[q.id]).length;
+    const progress = fullConfig.showProgress ? Math.round((completedCount / fullConfig.questions.length) * 100) : null;
 
     // 主题配置
-    const theme = config.theme || {};
+    const theme = fullConfig.theme;
     const primaryColor = theme.primary || 'blue';
     const bgColor = theme.background || 'slate-50';
 
@@ -166,11 +185,11 @@ function SurveySlide({ config }) {
         <div className={`w-full h-full overflow-auto bg-${bgColor}`}>
             {/* 标题区域 */}
             <div className="bg-white border-b border-slate-200 p-6 sticky top-0 z-10 shadow-sm">
-                <h1 className="text-2xl font-bold text-slate-800 mb-2">{config.title}</h1>
-                {config.description && (
-                    <p className="text-sm text-slate-600 mb-4">{config.description}</p>
+                <h1 className="text-2xl font-bold text-slate-800 mb-2">{fullConfig.title}</h1>
+                {fullConfig.description && (
+                    <p className="text-sm text-slate-600 mb-4">{fullConfig.description}</p>
                 )}
-                {config.required && (
+                {fullConfig.required && (
                     <p className="text-xs text-amber-600 font-medium">
                         <i className="fas fa-exclamation-circle mr-1"></i>
                         带有 * 的为必填项
@@ -180,10 +199,10 @@ function SurveySlide({ config }) {
                     <div className="mt-4">
                         <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
                             <span>完成进度</span>
-                            <span>{completedCount} / {config.questions.length} 题 ({progress}%)</span>
+                            <span>{completedCount} / {fullConfig.questions.length} 题 ({progress}%)</span>
                         </div>
                         <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div 
+                            <div
                                 className={`bg-${primaryColor}-500 h-2 rounded-full transition-all duration-300`}
                                 style={{ width: `${progress}%` }}
                             ></div>
@@ -194,7 +213,7 @@ function SurveySlide({ config }) {
 
             {/* 问卷内容 */}
             <div className="max-w-4xl mx-auto p-6">
-                {config.questions.map((question, index) => (
+                {fullConfig.questions.map((question, index) => (
                     <QuestionCard
                         key={question.id}
                         question={question}
@@ -226,7 +245,7 @@ function SurveySlide({ config }) {
                         {isSubmitting ? (
                             <><i className="fas fa-spinner fa-spin mr-2"></i>提交中...</>
                         ) : (
-                            <><i className="fas fa-paper-plane mr-2"></i>提交问卷</>
+                            <><i className="fas fa-paper-plane mr-2"></i>{fullConfig.submitButtonText}</>
                         )}
                     </button>
                 </div>
@@ -251,8 +270,6 @@ function SurveySlide({ config }) {
  * 问题卡片组件
  */
 function QuestionCard({ question, answer, error, onChange, theme, questionNumber }) {
-    const primaryColor = theme.primary || 'blue';
-
     switch (question.type) {
         case 'single':
             return <SingleChoiceQuestion question={question} answer={answer} error={error} onChange={onChange} theme={theme} questionNumber={questionNumber} />;
@@ -272,9 +289,7 @@ function QuestionCard({ question, answer, error, onChange, theme, questionNumber
 /**
  * 单选题组件
  */
-function SingleChoiceQuestion({ question, answer, error, onChange, theme, questionNumber }) {
-    const primaryColor = theme.primary || 'blue';
-
+function SingleChoiceQuestion({ question, answer, error, onChange, questionNumber }) {
     return (
         <div className="bg-white rounded-lg p-6 mb-4 shadow-sm border border-slate-200">
             <div className="flex items-start mb-4">
@@ -388,9 +403,7 @@ function MultipleChoiceQuestion({ question, answer, error, onChange, theme, ques
 /**
  * 简答题组件
  */
-function TextQuestion({ question, answer, error, onChange, theme, questionNumber }) {
-    const primaryColor = theme.primary || 'blue';
-
+function TextQuestion({ question, answer, error, onChange, questionNumber }) {
     const handleChange = (e) => {
         onChange(question.id, e.target.value);
     };
@@ -490,7 +503,6 @@ function RankingQuestion({ question, answer, error, onChange, theme, questionNum
     const primaryColor = theme.primary || 'blue';
     const [draggedItem, setDraggedItem] = useState(null);
     const ranking = Array.isArray(answer) ? answer : [];
-    const dragItemRef = useRef(null);
 
     // 初始化排序（如果未设置）
     useEffect(() => {
