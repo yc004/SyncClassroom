@@ -289,7 +289,9 @@ function QuestionCard({ question, answer, error, onChange, theme, questionNumber
 /**
  * 单选题组件
  */
-function SingleChoiceQuestion({ question, answer, error, onChange, questionNumber }) {
+function SingleChoiceQuestion({ question, answer, error, onChange, theme, questionNumber }) {
+    const primaryColor = theme.primary || 'blue';
+
     return (
         <div className="bg-white rounded-lg p-6 mb-4 shadow-sm border border-slate-200">
             <div className="flex items-start mb-4">
@@ -403,7 +405,9 @@ function MultipleChoiceQuestion({ question, answer, error, onChange, theme, ques
 /**
  * 简答题组件
  */
-function TextQuestion({ question, answer, error, onChange, questionNumber }) {
+function TextQuestion({ question, answer, error, onChange, theme, questionNumber }) {
+    const primaryColor = theme.primary || 'blue';
+
     const handleChange = (e) => {
         onChange(question.id, e.target.value);
     };
@@ -427,7 +431,7 @@ function TextQuestion({ question, answer, error, onChange, questionNumber }) {
                 <textarea
                     value={answer || ''}
                     onChange={handleChange}
-                    className="w-full p-4 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
+                    className={`w-full p-4 border-2 border-slate-200 rounded-lg focus:border-${primaryColor}-500 focus:outline-none resize-none`}
                     rows={6}
                     placeholder="请输入您的回答..."
                 />
@@ -556,22 +560,23 @@ function RankingQuestion({ question, answer, error, onChange, theme, questionNum
                     <i className="fas fa-info-circle mr-1"></i>拖拽选项调整顺序
                 </p>
                 <div className="space-y-2">
-                    {ranking.map((value, index) => {
-                        const option = getOption(value);
-                        if (!option) return null;
-                        
-                        return (
-                            <div
-                                key={value}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, index)}
-                                onDragOver={(e) => handleDragOver(e, index)}
-                                onDragEnd={handleDragEnd}
-                                className={`
-                                    flex items-center p-4 rounded-lg border-2 cursor-move transition-all
-                                    border-slate-200 bg-white hover:border-${primaryColor}-300
-                                `}
-                            >
+                    {ranking
+                        .map((value, index) => {
+                            const option = getOption(value);
+                            if (!option) return null;
+
+                            return (
+                                <div
+                                    key={value}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
+                                    onDragEnd={handleDragEnd}
+                                    className={`
+                                        flex items-center p-4 rounded-lg border-2 cursor-move transition-all
+                                        border-slate-200 bg-white hover:border-${primaryColor}-300
+                                    `}
+                                >
                                 <span className={`w-8 h-8 rounded-full bg-${primaryColor}-500 text-white flex items-center justify-center font-bold mr-3`}>
                                     {index + 1}
                                 </span>
@@ -580,8 +585,10 @@ function RankingQuestion({ question, answer, error, onChange, theme, questionNum
                                 </div>
                                 <i className="fas fa-grip-vertical text-slate-400 text-xl"></i>
                             </div>
-                        );
-                    })}
+                            );
+                        })
+                        .filter(Boolean)
+                    }
                 </div>
             </div>
         </div>
