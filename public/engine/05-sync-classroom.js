@@ -1140,7 +1140,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
     const renderSubmissionsPopupContent = (popupKey) => {
         if (popupKey !== 'submissions') return null;
         return (
-            <div className={`w-80 ${liquidGlassLightClass} rounded-2xl p-3 max-h-[70vh] flex flex-col`}>
+            <div className={`w-80 ${liquidGlassLightClass} rounded-2xl p-3 max-h-[calc(100dvh-180px)] flex flex-col`}>
                 <div className="flex items-center justify-between mb-2 shrink-0">
                     <div className="text-xs text-slate-600 font-bold">学生提交文件</div>
                     <button
@@ -1394,10 +1394,10 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
             contentRenderer = renderTextContent(previewContent, previewFile.name);
         }
 
-        return (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+        return createPortal(
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[999999] flex items-center justify-center p-4 overflow-y-auto" style={{ zIndex: 999999 }}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col shrink-0 max-h-full overflow-hidden">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center`}>
                                 <i className={`fas ${fileIcon.icon} ${fileIcon.color} text-lg`}></i>
@@ -1416,11 +1416,11 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-auto p-6 bg-slate-50">
+                    <div className="overflow-auto p-6 bg-slate-50 max-h-[70vh]">
                         {contentRenderer}
                     </div>
 
-                    <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-white">
+                    <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-white shrink-0">
                         <button
                             onClick={() => setPreviewFile(null)}
                             className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
@@ -1454,7 +1454,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
                     </div>
                 </div>
             </div>
-        );
+            , getPortalRoot());
     };
 
     const voteToolbarPrefix = (
@@ -1532,7 +1532,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
     }
 
     return (
-        <div className="flex flex-col h-screen bg-slate-900 text-slate-800 font-sans overflow-hidden select-none">
+        <div className="flex flex-col h-[100dvh] bg-slate-900 text-slate-800 font-sans select-none relative">
 
             {/* 顶栏 */}
             {!hideTopBar && (
@@ -1600,7 +1600,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
             <div className="flex-1 relative flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden">
                 <div ref={stageWrapRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
                     <div
-                        className="bg-white text-slate-800 relative shadow-2xl flex flex-col rounded-2xl overflow-y-auto no-scrollbar shrink-0"
+                        className="bg-white text-slate-800 relative shadow-2xl flex flex-col rounded-2xl overflow-hidden shrink-0"
                         style={{
                             width: '1280px',
                             height: '720px',
@@ -1754,7 +1754,7 @@ function SyncClassroom({ courseId, title, slides, onEndCourse, socket, isHost: i
                             <window.__LumeSyncUI.SideToolbar
                                 visible={true}
                                 side="left"
-                                offsetClass="left-4 top-[calc(50%+180px)] -translate-y-1/2"
+                                offsetClass="left-4 top-1/2 -translate-y-1/2"
                                 buttons={submissionsToolbarButtons}
                                 activePopupKey={showSubmissionsPanel ? 'submissions' : null}
                                 onActivePopupChange={(key) => setShowSubmissionsPanel(key === 'submissions')}
