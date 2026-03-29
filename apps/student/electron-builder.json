@@ -8,15 +8,30 @@
     "buildResources": "../../shared/build"
   },
   "files": [
-    "electron/**",
-    "public/**",
-    "../../shared/public/**",
-    "../../shared/build/**",
-    "../../packages/engine/**",
+    "package.json",
+    {
+      "from": "electron",
+      "to": "electron"
+    },
+    {
+      "from": "public",
+      "to": "public"
+    },
+    {
+      "from": "../../shared/public",
+      "to": "shared/public"
+    },
+    {
+      "from": "../../shared/build",
+      "to": "shared/build"
+    },
+    {
+      "from": "../../packages/engine",
+      "to": "packages/engine"
+    },
     {
       "from": "../common",
-      "to": "common",
-      "filter": ["**/*"]
+      "to": "common"
     }
   ],
   "extraResources": [

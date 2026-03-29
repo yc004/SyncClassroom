@@ -4,7 +4,16 @@
 const { app, BrowserWindow, ipcMain, dialog, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { Logger } = require('../../common/electron/logger.js');
+
+// 1. 判断当前是否是打包后的生产环境
+const isDev = !app.isPackaged;
+
+// 2. 动态计算 common 目录的路径
+const commonPath = isDev
+  ? path.join(__dirname, '../../common/electron') // 开发时：向外跳两级找 common
+  : path.join(__dirname, '../common/electron');   // 打包后：electron/main.js 向上跳一级到 app，再进入 common/electron
+
+const { Logger } = require(path.join(commonPath, 'logger.js'));
 
 let mainWindow;
 const logger = new Logger('LumeSync-Editor');
@@ -104,7 +113,12 @@ function checkLocalHealth(port) {
 
 function startServer() {
     const { fork } = require('child_process');
-    const serverPath = path.join(__dirname, '../../../packages/server/index.js');
+    // 动态计算 server 路径
+    // 开发环境: apps/editor/electron/main.js -> ../../../packages/server/index.js
+    // 生产环境: resources/app/electron/main.js -> ../packages/server/index.js
+    const serverPath = isDev
+        ? path.join(__dirname, '../../../packages/server/index.js')
+        : path.join(__dirname, '../packages/server/index.js');
     const cacheDir = path.join(app.getPath('userData'), 'cache');
     serverProcess = fork(serverPath, [], {
         env: { ...process.env, PORT: String(PORT), CHCP: '65001', LOG_DIR: logger.getLogDir(), LUMESYNC_CACHE_DIR: cacheDir },

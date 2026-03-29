@@ -5,8 +5,18 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, session, globalShortcut } = require('electron');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
-const { loadSettings, saveSettings } = require('../../common/electron/config.js');
-const { Logger } = require('../../common/electron/logger.js');
+
+// 1. 判断当前是否是打包后的生产环境
+const isDev = !app.isPackaged;
+
+// 2. 动态计算 common 目录的路径
+// 假设 main.js 位于 electron/main.js
+const commonPath = isDev
+  ? path.join(__dirname, '../../common/electron') // 开发时：向外跳两级找 common
+  : path.join(__dirname, '../common/electron');   // 打包后：electron/main.js 向上跳一级到 app，再进入 common/electron
+
+const { loadSettings, saveSettings } = require(path.join(commonPath, 'config.js'));
+const { Logger } = require(path.join(commonPath, 'logger.js'));
 
 // 初始化日志系统
 const logger = new Logger('LumeSync-Teacher');
@@ -74,17 +84,28 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // ── 启动内嵌服务器 ──────────────────────────────────────
 function startServer() {
-    const serverPath = path.join(__dirname, '../../../packages/server/index.js');
-    logger.info('SERVER', 'Starting server', { path: serverPath, exists: require('fs').existsSync(serverPath) });
+    // 动态计算 server 路径
+    // 开发环境: apps/teacher/electron/main.js -> ../../../packages/server/index.js
+    // 生产环境: resources/app/electron/main.js -> ../packages/server/index.js
+    const serverPath = isDev
+        ? path.join(__dirname, '../../../packages/server/index.js')
+        : path.join(__dirname, '../packages/server/index.js');
+    logger.info('SERVER', 'Starting server', { path: serverPath, exists: require('fs').existsSync(serverPath), isDev });
 
     try {
+        // 计算 app 目录的 node_modules 路径，用于 server 进程的模块查找
+        const appNodeModulesPath = isDev
+            ? path.join(__dirname, '../../node_modules')
+            : path.join(__dirname, '../node_modules');
+
         serverProcess = spawn(process.execPath, [serverPath], {
             env: {
                 ...process.env,
                 PORT: String(PORT),
                 CHCP: '65001',
                 LOG_DIR: logger.getLogDir(),
-                ELECTRON_RUN_AS_NODE: '1'
+                ELECTRON_RUN_AS_NODE: '1',
+                NODE_PATH: appNodeModulesPath // 设置模块搜索路径
             },
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: true,

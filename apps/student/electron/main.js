@@ -9,8 +9,17 @@ const {
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
-const { loadConfig, saveConfig, getAdminPasswordHash } = require('../../common/electron/config.js');
-const { Logger } = require('../../common/electron/logger.js');
+
+// 1. 判断当前是否是打包后的生产环境
+const isDev = !app.isPackaged;
+
+// 2. 动态计算 common 目录的路径
+const commonPath = isDev
+  ? path.join(__dirname, '../../common/electron') // 开发时：向外跳两级找 common
+  : path.join(__dirname, '../common/electron');   // 打包后：electron/main.js 向上跳一级到 app，再进入 common/electron
+
+const { loadConfig, saveConfig, getAdminPasswordHash } = require(path.join(commonPath, 'config.js'));
+const { Logger } = require(path.join(commonPath, 'logger.js'));
 
 // 初始化日志系统
 const logger = new Logger('LumeSync-Student');
