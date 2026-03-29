@@ -2,25 +2,30 @@
   "appId": "com.lumesync.teacher",
   "productName": "LumeSync Teacher",
   "copyright": "Copyright © 2024",
+  "electronVersion": "29.4.6",
   "directories": {
     "output": "../../dist/teacher",
-    "buildResources": "../../shared/build"
+    "buildResources": "../../shared/build",
+    "app": "."
   },
   "files": [
     "electron/**",
     "public/**",
-    "../../apps/common/electron/**",
-    "../../apps/shared/**",
-    "../../packages/server/**",
-    "../../packages/engine/**",
     "../../shared/public/**",
     "../../shared/build/**",
-    "../../node_modules/**"
+    "../../packages/engine/**",
+    "../../packages/server/**",
+    {
+      "from": "../common",
+      "to": "common",
+      "filter": ["**/*"]
+    }
   ],
   "extraMetadata": {
     "main": "electron/main.js"
   },
   "asar": false,
+  "npmArgs": ["--workspaces=false"],
   "fileAssociations": [
     {
       "ext": "lume",

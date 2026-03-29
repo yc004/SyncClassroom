@@ -5,15 +5,14 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --config electron-builder.json"
+    "build": "npx electron-builder --config electron-builder.json"
   },
   "dependencies": {
-    "@coze/api": "^1.3.9",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "electron": "29.4.6",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.13.3"
   },
   "keywords": [
     "lumesync",

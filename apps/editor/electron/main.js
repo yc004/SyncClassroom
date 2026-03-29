@@ -220,147 +220,17 @@ ipcMain.handle('get-log-dir', () => {
     return logger.getLogDir();
 });
 
-const { CozeAPI } = require('@coze/api');
-
-function normalizeCozeBaseURL(rawBaseURL) {
-    const base = String(rawBaseURL || '').trim().replace(/\/+$/, '');
-    if (!base) return '';
-    return base
-        .replace(/\/v3\/chat(?:\/completions)?$/i, '')
-        .replace(/\/open_api\/v2$/i, '')
-        .replace(/\/v1(?:\/chat\/completions)?$/i, '')
-        .replace(/\/+$/, '');
-}
+// AI 相关功能已暂时移除
+// 如需恢复，请重新安装 @coze/api 依赖并恢复相关代码
 
 ipcMain.handle('test-ai-connection', async (event, payload) => {
-    const baseURL = (payload?.baseURL || '').trim().replace(/\/+$/, '');
-    const apiKey = (payload?.apiKey || '').trim();
-    const model = (payload?.model || '').trim();
-    const timeoutMs = Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 30000;
-    const startedAt = Date.now();
-
-    if (!baseURL || !apiKey || !model) {
-        return { success: false, error: 'Missing baseURL/apiKey/model' };
-    }
-
-    logger.info('AI-TEST', 'Main-process test started', {
-        baseURL,
-        model,
-        timeoutMs
-    });
-
-    try {
-        const cozeClient = new CozeAPI({
-            baseURL,
-            token: apiKey
-        });
-
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error(`Request timeout (>${Math.round(timeoutMs / 1000)}s)`)), timeoutMs);
-        });
-
-        const requestPromise = cozeClient.chat.stream({
-            bot_id: model,
-            additional_messages: [{ role: 'user', content: 'ping' }]
-        });
-
-        const response = await Promise.race([requestPromise, timeoutPromise]);
-        const elapsedMs = Date.now() - startedAt;
-
-        logger.info('AI-TEST', 'Main-process test success', {
-            elapsedMs,
-            model
-        });
-        return {
-            success: true,
-            elapsedMs
-        };
-    } catch (error) {
-        const elapsedMs = Date.now() - startedAt;
-        const errMsg = error?.message || 'Unknown error';
-        logger.error('AI-TEST', 'Main-process test failed', {
-            elapsedMs,
-            errorName: error?.name || null,
-            error: errMsg
-        });
-        return {
-            success: false,
-            elapsedMs,
-            errorName: error?.name || null,
-            error: errMsg
-        };
-    }
+    return { success: false, error: 'AI 功能已暂时移除' };
 });
 
-// AI 聊天代理（使用 Coze 官方 SDK）
 ipcMain.on('proxy-ai-chat', async (event, payload) => {
-    const { requestId, apiKey, model, messages, temperature, stream } = payload;
-    const baseURL = normalizeCozeBaseURL(payload?.baseURL);
-
-    logger.info('AI-CHAT-PROXY', 'Request started', { requestId, model, stream, messageCount: messages?.length, baseURL });
-
-    try {
-        const cozeClient = new CozeAPI({
-            baseURL,
-            token: apiKey
-        });
-
-        // 转换消息格式
-        const additionalMessages = (messages || []).map(m => ({
-            role: m.role,
-            content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-        }));
-
-        const chatOptions = {
-            bot_id: model,
-            additional_messages: additionalMessages,
-            auto_save_history: false
-        };
-
-        // 如果指定了 temperature，添加到参数中
-        if (temperature !== undefined) {
-            chatOptions.temperature = temperature;
-        }
-
-        if (!stream) {
-            // 非流式响应
-            const response = await cozeClient.chat.stream(chatOptions);
-
-            let fullContent = '';
-            for await (const chunk of response) {
-                if (chunk.event === 'conversation.message.delta') {
-                    fullContent += chunk.data.content;
-                }
-            }
-
-            event.sender.send(`ai-chat-data-${requestId}`, { done: true, content: fullContent });
-            return;
-        }
-
-        // 流式响应处理
-        const streamResponse = cozeClient.chat.stream(chatOptions);
-
-        let fullContent = '';
-        for await (const chunk of streamResponse) {
-            if (event.sender.isDestroyed()) break;
-
-            if (chunk.event === 'conversation.message.delta') {
-                const delta = chunk.data.content;
-                fullContent += delta;
-                event.sender.send(`ai-chat-data-${requestId}`, { done: false, delta });
-            }
-        }
-
-        // 发送结束信号
-        if (!event.sender.isDestroyed()) {
-            event.sender.send(`ai-chat-data-${requestId}`, { done: true, content: fullContent });
-        }
-
-    } catch (error) {
-        if (!event.sender.isDestroyed()) {
-            logger.error('AI-CHAT-PROXY', 'Fatal error', { requestId, error: error.message });
-            event.sender.send(`ai-chat-error-${requestId}`, { message: error.message });
-        }
+    const { requestId } = payload;
+    if (!event.sender.isDestroyed()) {
+        event.sender.send(`ai-chat-error-${requestId}`, { message: 'AI 功能已暂时移除' });
     }
 });
 
@@ -382,27 +252,14 @@ ipcMain.handle('save-course', async (event, { filename, content }) => {
     }
 });
 
-// 读取 AI 配置
+// AI 配置功能已暂时移除
 ipcMain.handle('get-ai-config', () => {
-    const configPath = path.join(app.getPath('userData'), 'ai-config.json');
-    try {
-        if (fs.existsSync(configPath)) {
-            return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        }
-    } catch (e) { console.error(e); }
-    return { apiKey: '', baseURL: 'https://api.coze.cn', model: '' };
+    return { apiKey: '', baseURL: '', model: '' };
 });
 
-// 保存 AI 配置
 ipcMain.handle('save-ai-config', (event, config) => {
-    const configPath = path.join(app.getPath('userData'), 'ai-config.json');
-    try {
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
-        return true;
-    } catch (e) {
-        console.error(e);
-        return false;
-    }
+    // AI 功能已暂时移除，仅返回成功
+    return true;
 });
 
 ipcMain.handle('open-course-file', async () => {

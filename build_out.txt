@@ -1,0 +1,14 @@
+
+> lumesync-workspace@1.0.0 build:teacher
+> npm run build -w @lumesync/teacher
+
+
+> @lumesync/teacher@1.0.0 build
+> npx electron-builder --config electron-builder.json
+
+  • electron-builder  version=26.8.1 os=10.0.29553
+  • loaded configuration  file=c:\Users\Daniel\Documents\projects\SyncClassroom\apps\teacher\electron-builder.json
+  • Specified application directory equals to project dir — superfluous or wrong configuration  appDirectory=.
+  • packageManager not detected by file, falling back to environment detection  resolvedPackageManager=npm detected=c:\Users\Daniel\Documents\projects\SyncClassroom\apps\teacher
+  • detected workspace root for project using lock file  pm=npm config=undefined resolved=c:\Users\Daniel\Documents\projects\SyncClassroom projectDir=c:\Users\Daniel\Documents\projects\SyncClassroom\apps\teacher
+  • installing dependencies  pm=npm platform=win32 arch=x64 projectDir=c:\Users\Daniel\Documents\projects\SyncClassroom\apps\teacher appDir=c:\Users\Daniel\Documents\projects\SyncClassroom\apps\teacher workspaceRoot=c:\Users\Daniel\Documents\projects\SyncClassroom

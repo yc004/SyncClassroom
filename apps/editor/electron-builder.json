@@ -2,6 +2,7 @@
   "appId": "com.lumesync.editor",
   "productName": "LumeSync Editor",
   "copyright": "Copyright © 2024",
+  "electronVersion": "29.4.6",
   "directories": {
     "output": "../../dist/editor",
     "buildResources": "../../shared/build"
@@ -9,18 +10,21 @@
   "files": [
     "electron/**",
     "public/**",
-    "../../apps/common/electron/**",
-    "../../apps/shared/**",
-    "../../packages/server/**",
-    "../../packages/engine/**",
     "../../shared/public/**",
     "../../shared/build/**",
-    "../../node_modules/**"
+    "../../packages/engine/**",
+    "../../packages/server/**",
+    {
+      "from": "../common",
+      "to": "common",
+      "filter": ["**/*"]
+    }
   ],
   "extraMetadata": {
     "main": "electron/main.js"
   },
   "asar": false,
+  "npmArgs": ["--workspaces=false"],
   "fileAssociations": [
     {
       "ext": "lume",
@@ -33,7 +37,9 @@
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       }
     ],
     "requestedExecutionLevel": "asInvoker",
@@ -43,7 +49,9 @@
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "allowElevation": false,
-    "installerLanguages": ["zh_CN"],
+    "installerLanguages": [
+      "zh_CN"
+    ],
     "language": "2052",
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
