@@ -36,9 +36,15 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag -replace '^v', ''
-          $json = Get-Content package.json -Raw | ConvertFrom-Json
-          $json.version = $version
-          $json | ConvertTo-Json -Depth 100 | Set-Content package.json -Encoding UTF8
+          Write-Host "Updating version to $version"
+
+          $files = @("package.json", "apps/teacher/package.json", "apps/student/package.json", "apps/editor/package.json")
+          foreach ($file in $files) {
+            Write-Host "Updating $file"
+            $json = Get-Content $file -Raw | ConvertFrom-Json
+            $json.version = $version
+            $json | ConvertTo-Json -Depth 100 | Out-File $file -Encoding utf8NoBOM
+          }
 
       - name: Generate icons
         run: python shared/build/convert-icons.py
