@@ -41,7 +41,7 @@ jobs:
           $json | ConvertTo-Json -Depth 100 | Set-Content package.json -Encoding UTF8
 
       - name: Generate icons
-        run: python build/convert-icons.py
+        run: python shared/build/convert-icons.py
         env:
           PYTHONIOENCODING: utf-8
 

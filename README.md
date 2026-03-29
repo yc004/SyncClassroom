@@ -4,7 +4,7 @@
 
 | 教师端 / 学生端 | AI 课件编辑器 |
 |---|---|
-| ![](assets/tray-icon.png) | ![](assets/editor-icon.png) |
+| ![](shared/assets/tray-icon.png) | ![](shared/assets/editor-icon.png) |
 
 ## 功能概览
 
