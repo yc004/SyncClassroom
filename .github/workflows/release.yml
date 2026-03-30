@@ -46,6 +46,12 @@ jobs:
             $json | ConvertTo-Json -Depth 100 | Out-File $file -Encoding utf8NoBOM
           }
 
+          # Verify versions were updated
+          Write-Host "Root version: $(Get-Content package.json | ConvertFrom-Json).version"
+          Write-Host "Teacher version: $(Get-Content apps/teacher/package.json | ConvertFrom-Json).version"
+          Write-Host "Student version: $(Get-Content apps/student/package.json | ConvertFrom-Json).version"
+          Write-Host "Editor version: $(Get-Content apps/editor/package.json | ConvertFrom-Json).version"
+
       - name: Generate icons
         run: python shared/build/convert-icons.py
         env:
@@ -54,14 +60,48 @@ jobs:
       - name: Build verify-password.exe
         run: npm run build:verify
 
+      - name: Clean dist directories
+        run: |
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
+          New-Item -ItemType Directory -Force -Path "dist/teacher"
+          New-Item -ItemType Directory -Force -Path "dist/student"
+          New-Item -ItemType Directory -Force -Path "dist/editor"
+
       - name: Build Teacher installer
-        run: npm run build:teacher -- --publish never
+        run: npm run build:teacher -- --config.electronVersion=29.4.6 --publish never
+
+      - name: Verify Teacher installer
+        run: |
+          $files = Get-ChildItem "dist/teacher/*.exe"
+          if ($files.Count -ne 1) {
+            Write-Error "Expected 1 installer, found $($files.Count)"
+            exit 1
+          }
+          Write-Host "Teacher installer: $($files[0].Name)"
 
       - name: Build Student installer
-        run: npm run build:student -- --publish never
+        run: npm run build:student -- --config.electronVersion=29.4.6 --publish never
+
+      - name: Verify Student installer
+        run: |
+          $files = Get-ChildItem "dist/student/*.exe"
+          if ($files.Count -ne 1) {
+            Write-Error "Expected 1 installer, found $($files.Count)"
+            exit 1
+          }
+          Write-Host "Student installer: $($files[0].Name)"
 
       - name: Build Editor installer
-        run: npm run build:editor -- --publish never
+        run: npm run build:editor -- --config.electronVersion=29.4.6 --publish never
+
+      - name: Verify Editor installer
+        run: |
+          $files = Get-ChildItem "dist/editor/*.exe"
+          if ($files.Count -ne 1) {
+            Write-Error "Expected 1 installer, found $($files.Count)"
+            exit 1
+          }
+          Write-Host "Editor installer: $($files[0].Name)"
 
       - name: Get tag name
         id: tag
@@ -69,18 +109,31 @@ jobs:
 
       - name: Rename installers (remove spaces for upload)
         run: |
+          Write-Host "Teacher installers:"
           Get-ChildItem "dist/teacher/*.exe" | ForEach-Object {
+            Write-Host "  $($_.Name)"
             $newName = $_.Name -replace ' ', '-'
             if ($_.Name -ne $newName) { Rename-Item $_.FullName $newName }
           }
+
+          Write-Host "Student installers:"
           Get-ChildItem "dist/student/*.exe" | ForEach-Object {
+            Write-Host "  $($_.Name)"
             $newName = $_.Name -replace ' ', '-'
             if ($_.Name -ne $newName) { Rename-Item $_.FullName $newName }
           }
+
+          Write-Host "Editor installers:"
           Get-ChildItem "dist/editor/*.exe" | ForEach-Object {
+            Write-Host "  $($_.Name)"
             $newName = $_.Name -replace ' ', '-'
             if ($_.Name -ne $newName) { Rename-Item $_.FullName $newName }
           }
+
+          Write-Host "Final installers:"
+          Get-ChildItem "dist/teacher/*.exe" | ForEach-Object { Write-Host "  $($_.Name)" }
+          Get-ChildItem "dist/student/*.exe" | ForEach-Object { Write-Host "  $($_.Name)" }
+          Get-ChildItem "dist/editor/*.exe" | ForEach-Object { Write-Host "  $($_.Name)" }
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
