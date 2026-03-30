@@ -154,7 +154,7 @@ const chart = new Chart(ctx, {...});   // ReferenceError
 - 教师端可在“课堂设置”中调整“课件内容缩放”（60%～120%），用于缩放课件内部内容以减少溢出
 - 尽量使用 `w-full h-full`/`min-h-full` 做布局，不要依赖 `vw/vh` 作为关键尺寸
 
-### Canvas 与坐标处理（防止缩放错位）
+### Canvas 交互与坐标处理（防止缩放错位）
 
 由于课件画布可能被教师端通过 `transform: scale()` 进行整体缩放，如果使用常规的 `getBoundingClientRect` 或 `offsetX` 会导致点击坐标偏移。如果需要写交互式的 Canvas，**必须**使用引擎提供的 API：
 
@@ -171,6 +171,169 @@ const { wrapRef, dims } = window.CourseGlobalContext.canvas.useCanvasDims(20, 20
 
 // 3. 获取 HiDPI context (自动处理设备像素比)
 const ctx = window.CourseGlobalContext.canvas.getHiDpiContext2d(canvasElement, dims.cw, dims.ch);
+```
+
+#### 完整 Canvas 交互示例
+
+```tsx
+function CanvasInteractiveSlide() {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const { wrapRef, dims } = window.CourseGlobalContext.canvas.useCanvasDims(20, 20, 10, 10);
+    const [points, setPoints] = useState<Array<{x: number, y: number}>>([]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // 获取 HiDPI context（自动处理设备像素比）
+        const ctx = window.CourseGlobalContext.canvas.getHiDpiContext2d(canvas, dims.cw, dims.ch);
+
+        // 清空画布
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, dims.cw, dims.ch);
+
+        // 绘制所有点
+        ctx.fillStyle = '#3b82f6';
+        points.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }, [points, dims]);
+
+    const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        // 使用引擎 API 获取准确的坐标
+        const p = window.CourseGlobalContext?.canvas?.getCanvasPoint?.(e, e.currentTarget);
+        if (p) {
+            setPoints([...points, { x: p.x, y: p.y }]);
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-full p-6 bg-white">
+            <h2 className="text-2xl font-bold mb-4 shrink-0">
+                <i className="fas fa-pen mr-3 text-blue-500"></i> Canvas 交互
+            </h2>
+            <div ref={wrapRef} className="flex-1 w-full h-full bg-slate-50 rounded-xl overflow-hidden border-2 border-slate-200">
+                <canvas
+                    ref={canvasRef}
+                    width={dims.cw}
+                    height={dims.ch}
+                    onClick={handleCanvasClick}
+                    className="cursor-crosshair"
+                />
+            </div>
+            <p className="mt-4 text-sm text-slate-600">点击画布添加点（已自动处理缩放）</p>
+        </div>
+    );
+}
+```
+
+---
+
+## 运行时 UI 组件
+
+### window.__LumeSyncUI
+
+课堂运行时提供的 UI 组件集合，用于构建统一风格（液态玻璃）的侧边工具栏与弹窗。
+
+```tsx
+const { SideToolbar, styles } = window.__LumeSyncUI;
+```
+
+#### 样式类
+
+| 字段 | 说明 |
+|------|------|
+| `styles.liquidGlassDark` | 深色液态玻璃样式（适合深色工具栏/结果弹窗） |
+| `styles.liquidGlassLight` | 浅色液态玻璃样式（适合浅色设置弹窗） |
+
+#### SideToolbar - 通用侧边栏
+
+使用配置模式构建侧边工具栏：
+
+```tsx
+function SlideWithToolbar() {
+    const [activePopupKey, setActivePopupKey] = useState<string | null>(null);
+
+    const buttons = [
+        {
+            id: 'tools',
+            title: '工具',
+            iconClass: 'fa-pen',
+            popupKey: 'tools'
+        },
+        {
+            id: 'color',
+            title: '颜色',
+            iconClass: 'fa-palette',
+            popupKey: 'color'
+        },
+        {
+            id: 'clear',
+            title: '清空',
+            iconClass: 'fa-trash-can',
+            onClick: () => alert('清空画布')
+        }
+    ];
+
+    const renderPopupContent = (popupKey: string | null) => {
+        if (popupKey === 'tools') {
+            return (
+                <div className={`w-64 ${styles.liquidGlassLight} rounded-2xl p-3`}>
+                    <h3 className="font-bold mb-2">工具</h3>
+                    <button className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg">画笔</button>
+                </div>
+            );
+        }
+        if (popupKey === 'color') {
+            return (
+                <div className={`w-64 ${styles.liquidGlassLight} rounded-2xl p-3`}>
+                    <h3 className="font-bold mb-2">颜色</h3>
+                    <div className="grid grid-cols-4 gap-2">
+                        {['red', 'blue', 'green', 'yellow'].map(color => (
+                            <button key={color} className={`w-8 h-8 bg-${color}-500 rounded-lg`} />
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    return (
+        <div className="relative h-full">
+            <window.__LumeSyncUI.SideToolbar
+                visible={true}
+                side="left"
+                buttons={buttons}
+                activePopupKey={activePopupKey}
+                onActivePopupChange={setActivePopupKey}
+                renderPopupContent={renderPopupContent}
+            />
+            <div className="ml-20 p-6">
+                <h2 className="text-2xl font-bold mb-4">课件内容</h2>
+                {/* 课件主要内容 */}
+            </div>
+        </div>
+    );
+}
+```
+
+### WebPageSlide - 网页嵌入组件
+
+用于在课件中嵌入外部网页：
+
+```tsx
+function WebPageSlide() {
+    return (
+        <window.CourseComponents.WebPageSlide
+            url="https://example.com/survey"
+            title="课后问卷"
+            openLabel="打开问卷"
+        />
+    );
+}
 ```
 
 ---
@@ -403,12 +566,16 @@ window.CourseGlobalContext.submitContent(options: {
 
 #### 模式 2：合并为一个文件（mergeFile = true）
 
-所有学生的提交合并到一个 CSV 文件中，格式：
+所有学生提交合并到一个文件（CSV 格式），格式：
 ```
-Timestamp,IP,Content,StudentName
-2024-03-24T10:30:00.000Z,192.168.1.101,"学生的回答",张三
-2024-03-24T10:30:15.000Z,192.168.1.102,"另一个回答",李四
+提交时间,学生IP,学生姓名,学号,Content
+2024-03-24T10:30:00.000Z,192.168.1.101,张三,20230001,"学生的回答"
+2024-03-24T10:30:15.000Z,192.168.1.102,李四,20230002,"另一个回答"
 ```
+
+**重要说明：**
+- ✅ 学生信息由服务器自动添加（根据座位表查询）
+- ❌ 客户端不应手动添加学生信息字段
 
 ### 使用示例
 
@@ -743,10 +910,13 @@ const [value, setValue] = window.CourseGlobalContext.useLocalVar(
 
 #### 使用示例
 
-**示例 1：菜单展开状态**
+**示例 1：菜单展开状态（带持久化）**
 ```tsx
 function MenuSlide() {
-    const [menuOpen, setMenuOpen] = window.CourseGlobalContext.useLocalVar('menu:open', false);
+    // 使用 persist 选项，刷新页面后保留设置
+    const [menuOpen, setMenuOpen] = window.CourseGlobalContext.useLocalVar('menu:open', false, {
+        persist: true
+    });
 
     return (
         <div className="flex flex-col h-full p-8 bg-white">
@@ -771,9 +941,10 @@ function MenuSlide() {
 }
 ```
 
-**示例 2：提示框显示**
+**示例 2：提示框显示（临时状态）**
 ```tsx
 function TooltipSlide() {
+    // 提示框是临时状态，不需要持久化
     const [showTooltip, setShowTooltip] = window.CourseGlobalContext.useLocalVar('tooltip:visible', false);
 
     return (

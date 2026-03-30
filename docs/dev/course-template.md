@@ -103,7 +103,28 @@ const mySlides = [
 - 如果需要绝对尺寸，优先使用 `px`（以 1280×720 画布为基准设计）
 - 尽量避免把内容渲染到画布外（如大面积 `translate`/绝对定位超出画布）
 
-## 侧边工具栏开发规范（推荐）
+### Canvas 交互与缩放
+
+如果课件包含交互式 Canvas，**必须**使用引擎提供的 API 来处理点击坐标，以应对画布缩放：
+
+```tsx
+// 1. 获取准确的点击坐标（自动处理缩放）
+const p = window.CourseGlobalContext?.canvas?.getCanvasPoint(e, canvasElement);
+if (p) {
+    console.log("逻辑坐标:", p.x, p.y);     // Canvas 内部坐标
+    console.log("相对坐标:", p.nx, p.ny);    // 0-1 范围的比例
+}
+
+// 2. 获取响应式尺寸
+const { wrapRef, dims } = window.CourseGlobalContext.canvas.useCanvasDims(20, 20, 10, 10);
+
+// 3. 获取 HiDPI context（自动处理设备像素比）
+const ctx = window.CourseGlobalContext.canvas.getHiDpiContext2d(canvasElement, dims.cw, dims.ch);
+```
+
+## 运行时 UI 组件（推荐）
+
+### 侧边工具栏开发规范
 
 当课件需要扩展教师端侧边工具栏（如投票、批注、计时器等）时，统一使用运行时通用组件 `window.__LumeSyncUI.SideToolbar`：
 
@@ -113,6 +134,76 @@ const mySlides = [
 - 工具栏与弹窗统一使用液态玻璃风格（`window.__LumeSyncUI.styles`）
 
 这样可确保交互一致、样式一致，并显著降低新增工具模块的开发成本。
+
+#### 完整示例
+
+```tsx
+function SlideWithToolbar() {
+    const [activePopupKey, setActivePopupKey] = useState<string | null>(null);
+
+    const buttons = [
+        {
+            id: 'tools',
+            title: '工具',
+            iconClass: 'fa-pen',
+            popupKey: 'tools'
+        },
+        {
+            id: 'clear',
+            title: '清空',
+            iconClass: 'fa-trash-can',
+            onClick: () => clearCanvas()
+        }
+    ];
+
+    const renderPopupContent = (popupKey: string | null) => {
+        if (popupKey === 'tools') {
+            const { styles } = window.__LumeSyncUI;
+            return (
+                <div className={`w-64 ${styles.liquidGlassLight} rounded-2xl p-3`}>
+                    <h3 className="font-bold mb-2">工具</h3>
+                    <button className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg">画笔</button>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    return (
+        <div className="relative h-full">
+            <window.__LumeSyncUI.SideToolbar
+                visible={true}
+                side="left"
+                buttons={buttons}
+                activePopupKey={activePopupKey}
+                onActivePopupChange={setActivePopupKey}
+                renderPopupContent={renderPopupContent}
+            />
+            <div className="ml-20 p-6">
+                {/* 课件内容 */}
+            </div>
+        </div>
+    );
+}
+```
+
+### WebPageSlide - 网页嵌入组件
+
+用于在课件中嵌入外部网页：
+
+```tsx
+function WebPageSlide() {
+    return (
+        <window.CourseComponents.WebPageSlide
+            url="https://example.com/survey"
+            title="课后问卷"
+            openLabel="打开问卷"
+        />
+    );
+}
+```
+
+---
 
 ## 组件规范
 
@@ -909,7 +1000,7 @@ function Slide2() {
                     <p className="text-slate-600">数据集：{dataset}</p>
                     {mousePos && (
                         <div className="absolute text-xs text-slate-500">
-                            鼠标位置：({mousePos.x.toFixed(0)}, {mousePos.y.toFixed(0)})
+                            鼠标位置（本地计算）：({mousePos.x.toFixed(0)}, {mousePos.y.toFixed(0)})
                         </div>
                     )}
                 </div>
@@ -974,6 +1065,64 @@ window.CourseData = {
     dependencies: [],
     slides: mySlides
 };
+```
+
+## Canvas 交互示例
+
+使用引擎提供的 API 实现准确的 Canvas 交互（自动处理画布缩放）：
+
+```tsx
+function CanvasInteractiveSlide() {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const { wrapRef, dims } = window.CourseGlobalContext.canvas.useCanvasDims(20, 20, 10, 10);
+    const [points, setPoints] = useState<Array<{x: number, y: number}>>([]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // 获取 HiDPI context（自动处理设备像素比）
+        const ctx = window.CourseGlobalContext.canvas.getHiDpiContext2d(canvas, dims.cw, dims.ch);
+
+        // 清空画布
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, dims.cw, dims.ch);
+
+        // 绘制所有点
+        ctx.fillStyle = '#3b82f6';
+        points.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }, [points, dims]);
+
+    const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        // 使用引擎 API 获取准确的坐标（自动处理缩放）
+        const p = window.CourseGlobalContext?.canvas?.getCanvasPoint?.(e, e.currentTarget);
+        if (p) {
+            setPoints([...points, { x: p.x, y: p.y }]);
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-full p-6 bg-white">
+            <h2 className="text-2xl font-bold mb-4 shrink-0">
+                <i className="fas fa-pen mr-3 text-blue-500"></i> Canvas 交互演示
+            </h2>
+            <div ref={wrapRef} className="flex-1 w-full h-full bg-slate-50 rounded-xl overflow-hidden border-2 border-slate-200">
+                <canvas
+                    ref={canvasRef}
+                    width={dims.cw}
+                    height={dims.ch}
+                    onClick={handleCanvasClick}
+                    className="cursor-crosshair"
+                />
+            </div>
+            <p className="mt-4 text-sm text-slate-600">点击画布添加点（坐标已自动处理画布缩放）</p>
+        </div>
+    );
+}
 ```
 
 ## 提交内容 API（学生端）
