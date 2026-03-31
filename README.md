@@ -1,51 +1,68 @@
-# 萤火互动课堂（SyncClassroom / LumeSync）
+# LumeSync / 萤火互动课堂
 
-基于 React + Electron 的低延迟局域网互动教学系统，包含教师端和学生端。
+<div align="center">
 
-| 教师端 | 学生端 |
+**基于 React + Electron 的低延迟局域网互动教学系统**
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0-brightgreen)](https://nodejs.org/)
+[![Electron](https://img.shields.io/badge/electron-%3E%3D24.0-9FE349)](https://electronjs.org/)
+
+[功能特性](#-功能特性) •
+[快速开始](#-快速开始) •
+[课件开发](#-课件开发) •
+[文档](#-文档) •
+[技术栈](#-技术栈)
+
+</div>
+
+---
+
+## 📸 界面预览
+<div align="center">
+  <img src="shared/assets/tray-icon.png" width="100" height="100">
+</div>
+
+| 教师端 (LumeSync Teacher) | 学生端 (LumeSync Student) |
 |---|---|
-| ![](shared/assets/tray-icon.png) | ![](shared/assets/student-icon.png) |
+| 支持局域网课程同步、交互控制、多班级管理 | 支持实时接收课程内容、自动连接、提交作业 |
 
-## 功能概览
+## ✨ 功能特性
 
-- 课堂同步：基于 Socket.io 的局域网实时同步（翻页、课程切换、学生状态等）
-- **教师交互同步**：教师可开启同步，将操作实时同步到所有学生端（点击、拖拽、面板切换等）
-- 课件热加载：课件为纯文本脚本，运行时由 Babel 编译执行，无需构建工具
-- **VSCode 插件编辑器**：提供 VSCode 插件形式的课件编辑器，支持实时预览和 AI 辅助
-- 跨端桌面应用：教师端 / 学生端均提供独立安装包
-- 离线资源缓存：课件依赖的 CDN 资源会自动下载并缓存到本地
-- 内容缩放：教师端"课堂设置"可调课件内容缩放（60%～120%），降低溢出风险
-- **多班级管理**：机房视图支持创建和管理多个班级的座位表，适用于一个机房服务于多个班级的场景
+### 核心功能
+- 🔄 **课堂同步**：基于 Socket.io 的局域网实时同步（翻页、课程切换、学生状态等）
+- 🖱️ **教师交互同步**：教师可开启同步，将操作实时同步到所有学生端（点击、拖拽、面板切换等）
+- 📄 **课件热加载**：课件为纯文本脚本，运行时由 Babel 编译执行，无需构建工具
+- 💻 **跨端桌面应用**：教师端 / 学生端均提供独立安装包
+- 📦 **离线资源缓存**：课件依赖的 CDN 资源会自动下载并缓存到本地
 
-## 课件文件格式（.lume）
+### 编辑器与工具
+- 🛠️ **VSCode 插件编辑器**：提供 VSCode 插件形式的课件编辑器，支持实时预览和 AI 辅助
+- 🔍 **RAG 知识库**：内置教学知识库，支持按分类管理（系统API、互动组件、教学策略、动画效果等）
+- 📁 **文件导入**：支持导入 TXT、Markdown、JSON 文件，自动切分为知识块
+- 🗑️ **批量管理**：支持批量选择和删除自定义知识
 
-项目使用自有课件后缀 `.lume`（内容仍是可执行的 TSX/JSX/TS/JS 脚本文本）。
+### 课堂管理
+- 🔧 **内容缩放**：教师端"课堂设置"可调课件内容缩放（60%～120%），降低溢出风险
+- 👥 **多班级管理**：机房视图支持创建和管理多个班级的座位表，适用于一个机房服务于多个班级的场景
+- 📊 **提交管理**：自动收集学生提交的内容，按班级和日期组织存储
 
-- 教师端导入/导出、VSCode 插件打开/保存统一使用 `.lume`
-- 服务端扫描 `public/courses/` 时支持 `.lume`，并兼容旧格式（`.tsx/.ts/.jsx/.js`）
-- 教师/学生端渲染使用固定 1280×720 画布并按窗口缩放显示，尽量保证显示一致性
-
-## VSCode 插件编辑器
-
-- 自然语言创作：通过对话描述需求，AI 生成完整课件脚本
-- 流式实时预览：生成过程中预览区同步更新，固定 16:9 比例
-- 源码编辑体验：集成 VSCode 编辑器，支持语法高亮、智能提示等
-- 一键修复：课件编译错误可一键将错误信息回传给 AI 自动修复
-- **RAG 知识库**：内置教学知识库，支持按分类管理（系统API、互动组件、教学策略、动画效果等），AI 自动检索相关知识生成课件
-- **文件导入**：支持导入 TXT、Markdown、JSON 文件，自动切分为知识块
-- **批量管理**：支持批量选择和删除自定义知识
-
-## 快速开始（开发模式）
+## 🚀 快速开始
 
 ### 环境要求
 
 - Node.js 18+
 - Python 3.x（仅在打包/生成图标时需要）
 
-### 启动服务端（Web 版本）
+### 安装依赖
 
 ```bash
 npm install
+```
+
+### 启动服务端（Web 版本）
+
+```bash
 node server.js
 ```
 
@@ -56,18 +73,18 @@ node server.js
 ### 启动桌面端（Electron）
 
 ```bash
-npm install
+# 教师端
 npm run start:teacher
+
+# 学生端
 npm run start:student
 ```
 
-VSCode 插件编辑器请参考：[apps/editor-plugin/README.md](apps/editor-plugin/README.md)
-
-## 打包
+### 打包应用
 
 ```bash
 # 一键打包（生成教师端 + 学生端安装包）
-build\\build.bat
+build\build.bat
 
 # 或分步执行
 python build/convert-icons.py
@@ -76,43 +93,17 @@ npm run build:teacher
 npm run build:student
 ```
 
-更多细节见 [build/BUILD-README.md](build/BUILD-README.md)。
+更多细节见 [build/BUILD-README.md](build/BUILD-README.md)
 
-## 学生端说明
+## 📚 课件开发
 
-- 安装需要管理员权限
-- 自动注册为 Windows 服务（`LumeSyncStudent`），开机自启
-- 普通用户无法关闭服务
-- 卸载时需要管理员密码（默认 `admin123`）
-- 管理员密码可在教师端"课堂设置"中修改并推送到在线学生端
+### 课件文件格式
 
-## 课件开发
+项目使用自有课件后缀 `.lume`（内容仍是可执行的 TSX/JSX/TS/JS 脚本文本）。
 
-课件文件放入 `public/courses/`，刷新教师端即可识别。
-
-### 内置组件库
-
-引擎提供以下可复用组件：
-
-- **`SurveySlide`** - 问卷通用组件（支持单选、多选、简答、评分、排序五种题型，自动提交和 CSV 导出）
-- **`WebPageSlide`** - 网页嵌入组件
-
-详细使用方法：
-- 问卷组件：[docs/survey-component-guide.md](docs/survey-component-guide.md)
-- API 文档：[docs/API.md](docs/API.md)
-- 机房视图：[docs/classroom-view-guide.md](docs/classroom-view-guide.md)
-
-### RAG 知识库系统
-
-VSCode 插件内置智能知识库，支持以下功能：
-
-- **分类管理**：知识按分类存储（系统API、互动组件、教学策略、动画效果、样式系统、状态管理、多媒体、最佳实践）
-- **智能检索**：基于关键词匹配和相似度计算，自动检索相关知识
-- **文件导入**：支持导入 TXT、Markdown、JSON 文件，自动切分为知识块
-- **批量操作**：支持批量选择和删除自定义知识
-- **内置知识**：预置 21 条内置知识，涵盖 API 使用、教学策略、最佳实践等
-
-知识库位置：`public/knowledge/categories/`，按分类文件管理，方便扩展和更新。
+- 教师端导入/导出、VSCode 插件打开/保存统一使用 `.lume`
+- 服务端扫描 `public/courses/` 时支持 `.lume`，并兼容旧格式（`.tsx/.ts/.jsx/.js`）
+- 教师/学生端渲染使用固定 1280×720 画布并按窗口缩放显示，尽量保证显示一致性
 
 ### 基本示例
 
@@ -138,25 +129,40 @@ window.CourseData = {
 };
 ```
 
-更多参考：
-- [docs/course-template.md](./docs/course-template.md)（课件开发模板）
-- [docs/API.md](./docs/API.md)（课件 API 文档）
+### 内置组件库
 
-## 用户使用说明（零基础）
+引擎提供以下可复用组件：
 
-- [docs/用户说明-教师端.md](./docs/用户说明-教师端.md)
-- [docs/用户说明-学生端.md](./docs/用户说明-学生端.md)
-- [apps/editor-plugin/README.md](./apps/editor-plugin/README.md) - VSCode 插件编辑器使用说明
+| 组件 | 说明 | 文档 |
+|---|---|---|
+| **`SurveySlide`** | 问卷通用组件（支持单选、多选、简答、评分、排序五种题型，自动提交和 CSV 导出） | [文档](docs/survey-component-guide.md) |
+| **`WebPageSlide`** | 网页嵌入组件 | [文档](docs/API.md) |
 
-## 开发者文档
+详细使用方法：
+- 问卷组件：[docs/survey-component-guide.md](docs/survey-component-guide.md)
+- API 文档：[docs/API.md](docs/API.md)
+- 机房视图：[docs/classroom-view-guide.md](docs/classroom-view-guide.md)
 
-- [docs/API.md](./docs/API.md) - 课件 API 完整文档
-- [docs/interaction-sync-guide.md](./docs/interaction-sync-guide.md) - 交互同步系统
-- [docs/knowledge-base-guide.md](./docs/knowledge-base-guide.md) - 知识库系统
-- [docs/knowledge-update-guide.md](./docs/knowledge-update-guide.md) - 知识库更新指南
-- [public/knowledge/categories/README.md](./public/knowledge/categories/README.md) - 知识库管理说明
+## 📖 文档
 
-## 项目结构
+### 用户文档
+- [用户说明-教师端](docs/用户说明-教师端.md)
+- [用户说明-学生端](docs/用户说明-学生端.md)
+- [VSCode 插件编辑器使用说明](apps/editor-plugin/README.md)
+
+### 开发者文档
+- [课件 API 完整文档](docs/API.md)
+- [交互同步系统](docs/interaction-sync-guide.md)
+- [知识库系统](docs/knowledge-base-guide.md)
+- [知识库更新指南](docs/knowledge-update-guide.md)
+- [知识库管理说明](public/knowledge/categories/README.md)
+
+### 模板与示例
+- [课件开发模板](docs/course-template.md)
+- [KNN 课程示例](shared/public/courses/Knn.lume)
+- [问卷组件示例](shared/public/courses/survey-demo.lume)
+
+## 🏗️ 项目结构
 
 ```
 SyncClassroom/
@@ -197,9 +203,9 @@ SyncClassroom/
 └── .github/workflows/release.yml      # 打 tag 自动发布 Release
 ```
 
-**详细架构文档：** [server/README.md](./server/README.md)
+**详细架构文档：** [server/README.md](server/README.md)
 
-## 技术栈
+## 🛠️ 技术栈
 
 ### 后端
 - **框架**: Express.js
@@ -218,6 +224,32 @@ SyncClassroom/
 - **打包**: electron-builder
 - **多架构**: 教师端 / 学生端
 
-## 许可证
+## 📝 RAG 知识库系统
 
-[MIT](https://opensource.org/licenses/MIT)
+VSCode 插件内置智能知识库，支持以下功能：
+
+- **分类管理**：知识按分类存储（系统API、互动组件、教学策略、动画效果、样式系统、状态管理、多媒体、最佳实践）
+- **智能检索**：基于关键词匹配和相似度计算，自动检索相关知识
+- **文件导入**：支持导入 TXT、Markdown、JSON 文件，自动切分为知识块
+- **批量操作**：支持批量选择和删除自定义知识
+- **内置知识**：预置 21 条内置知识，涵盖 API 使用、教学策略、最佳实践等
+
+知识库位置：`public/knowledge/categories/`，按分类文件管理，方便扩展和更新。
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 许可证
+
+本项目采用 [MIT](LICENSE) 许可证。
+
+---
+
+<div align="center">
+
+**Made with ❤️ by SyncClassroom Team**
+
+[⬆ 回到顶部](#syncclassroom--萤火互动课堂)
+
+</div>
