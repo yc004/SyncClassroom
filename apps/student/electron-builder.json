@@ -19,24 +19,12 @@
       "to": "public"
     },
     {
-      "from": "../../shared/public",
-      "to": "shared/public"
-    },
-    {
       "from": "../../shared/build",
       "to": "shared/build"
     },
     {
-      "from": "../../shared/assets",
-      "to": "shared/assets"
-    },
-    {
       "from": "../shared",
       "to": "shared"
-    },
-    {
-      "from": "../../packages/engine",
-      "to": "packages/engine"
     },
     {
       "from": "../common",
