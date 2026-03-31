@@ -148,20 +148,75 @@ function saveSubmission(reqBody, res) {
             let header, row;
             if (content && typeof content === 'object' && content.header && content.row) {
                 // 新格式：包含表头和数据行
+                // 注意：客户端已经生成了带空位的 CSV 行（时间为空,IP为空,姓名为空,学号为空,答案...）
+                // 服务器只需要填充前四个字段的学生信息
                 header = content.header;
 
-                // 获取学生信息并填充到数据行中
-                const rowFields = content.row.split(',');
+                // 解析 CSV 行（正确处理带引号的字段）
+                const parseCSVLine = (line) => {
+                    const result = [];
+                    let current = '';
+                    let inQuotes = false;
+                    let i = 0;
+
+                    while (i < line.length) {
+                        const char = line[i];
+
+                        if (char === '"') {
+                            if (inQuotes && line[i + 1] === '"') {
+                                // 双引号转义
+                                current += '"';
+                                i += 2;
+                            } else {
+                                // 切换引号状态
+                                inQuotes = !inQuotes;
+                                i++;
+                            }
+                        } else if (char === ',' && !inQuotes) {
+                            // 字段分隔符
+                            result.push(current.trim());
+                            current = '';
+                            i++;
+                        } else {
+                            current += char;
+                            i++;
+                        }
+                    }
+
+                    if (current.trim() || result.length > 0) {
+                        result.push(current.trim());
+                    }
+
+                    return result;
+                };
+
+                const rowFields = parseCSVLine(content.row);
+
                 // 填充学生信息：时间,IP,姓名,学号,答案...
-                rowFields[0] = rowFields[0]; // 保留时间戳
-                rowFields[1] = clientIp;    // 填充IP
-                rowFields[2] = studentInfo.name || ''; // 填充姓名
+                // 确保有足够的字段
+                while (rowFields.length < 5) {
+                    rowFields.push('');
+                }
+
+                rowFields[0] = timestamp;      // 填充时间戳
+                rowFields[1] = clientIp;       // 填充IP
+                rowFields[2] = studentInfo.name || '';  // 填充姓名
                 rowFields[3] = studentInfo.studentId || ''; // 填充学号
-                row = rowFields.join(',') + '\n';
+
+                // 重新构建 CSV 行，正确转义每个字段
+                const escapeCSVField = (field) => {
+                    const str = String(field || '');
+                    if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                };
+
+                row = rowFields.map(escapeCSVField).join(',') + '\n';
 
                 console.log(`[save-submission] New format with header and row`);
                 console.log(`[save-submission] Header: "${header}"`);
-                console.log(`[save-submission] Row: "${row}"`);
+                console.log(`[save-submission] Row: "${row.trim()}"`);
             } else {
                 // 默认格式：时间,IP,姓名,学号,内容
                 header = 'Timestamp,IP,Name,StudentId,Content';

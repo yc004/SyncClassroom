@@ -15,8 +15,11 @@ const { useState, useEffect, useCallback } = React;
  * - 自动验证必填项
  */
 function SurveySlide({ config }) {
-    // 自动生成问卷 ID（如果未提供）
-    const surveyId = config.id || `survey_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    // 自动生成问卷 ID
+    // 优先级：配置 ID > 课程 ID > 随机 ID
+    const courseMeta = window.CourseGlobalContext?.getCurrentCourseMeta?.();
+    const courseId = courseMeta?.courseId || 'unknown';
+    const surveyId = config.id || courseId;
 
     // 自动为问题生成 ID（如果未提供）
     const questions = config.questions.map((q, index) => ({
