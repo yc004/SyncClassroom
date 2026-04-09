@@ -1,6 +1,8 @@
-﻿# Quick Start (Submodule Workflow)
+# Quick Start
 
-## 1) Clone with submodules
+本文是最短启动路径。更完整的运行说明见 [docs/02-operations/01-quick-start.md](docs/02-operations/01-quick-start.md)。
+
+## 1. 克隆并初始化
 
 ```bash
 git clone --recurse-submodules https://github.com/yc004/SyncClassroom.git
@@ -8,53 +10,38 @@ cd SyncClassroom
 npm run repos:init
 ```
 
-## 2) Work in target repository directly
-
-Teacher example:
+## 2. 直接从根目录启动
 
 ```bash
-cd repos/teacher
-npm install
-npm run start
-```
-
-Core example:
-
-```bash
-cd ../core
-npm install
-npm start
-```
-
-Student example:
-
-```bash
-cd ../student
-npm install
-npm run start
-```
-
-## Root scripts (start specified app)
-
-```bash
-npm run start:core
 npm run start:teacher
-npm run start:teacher-server
 npm run start:student
 ```
 
-## 3) Push directly (no export script)
+调试服务时也可以单独启动：
 
 ```bash
-cd repos/<target-repo>
+npm run start:teacher-server
+npm run start:core
+```
+
+## 3. 推荐运行顺序
+
+1. 先启动教师端或教师服务
+2. 再启动学生端
+3. 学生端输入教师机地址后连接课堂
+
+## 4. 提交代码
+
+不要在根仓直接维护业务代码。进入对应子仓库后直接提交：
+
+```bash
+cd repos/teacher
 git add .
-git commit -m "your change"
+git commit -m "feat: your change"
 git push
 ```
 
-## 4) Update root pointers (optional)
-
-当子仓库有新提交后，如需在根仓记录最新引用：
+如果需要在根仓记录新的子模块指针：
 
 ```bash
 cd ../../

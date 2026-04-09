@@ -34,3 +34,4 @@ Use teacher service data-plane APIs instead (`/api/teacher/*`).
 
 - `PORT`: server port, default `3000`
 - `LUMESYNC_ENGINE_SRC_DIR`: override engine source static directory
+- `LUMESYNC_CACHE_DIR`: override static asset root, default `repos/teacher/shared/public`

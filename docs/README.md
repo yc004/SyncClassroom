@@ -1,49 +1,58 @@
-# Docs 文档导航
+# 萤火课堂说明书
 
-> 已完成目录结构化整理，以下为最新路径。
+本目录按“专业说明书”的阅读方式重新组织。建议不要按旧文件名跳读，而是按章节顺序阅读。
 
-## 1) 用户使用手册（`docs/user/`）
+## 阅读建议
 
-- [教师端使用说明](./user/用户说明-教师端.md)
-- [学生端使用说明](./user/用户说明-学生端.md)
-- [机房视图使用指南](./user/classroom-view-guide.md)
-- [课程文件夹管理功能说明](./user/course-folder-guide.md)
-- [VSCode 插件编辑器](../repos/editor-plugin/README.md)
+如果你是第一次接触项目，建议按下面顺序阅读：
 
-## 2) 课件开发与 API（`docs/dev/`）
+1. 先看总览，理解系统由哪些端组成、职责如何划分
+2. 再看运行章节，了解如何初始化、启动和协作开发
+3. 根据角色阅读教师端或学生端手册
+4. 如果要开发课件、组件或对接协议，再进入开发与运行时章节
+5. 最后把 API、仓库链接和术语表当作检索型资料使用
 
-- [课件 API 文档](./dev/API.md)
-- [课程开发模板](./dev/course-template.md)
-- [创建课件 Skill 说明](./dev/create-course.md)
+## 文档目录
 
-## 3) 组件开发（`docs/components/`）
+### 01 总览
 
-- [投票组件使用指南](./components/vote-component-guide.md)
-- [问卷组件开发规范](./components/survey-component-guide.md)
+- [系统介绍](./01-overview/01-system-overview.md)
+- [系统架构](./01-overview/02-system-architecture.md)
+- [仓库地图](./01-overview/03-repository-map.md)
 
-## 4) 课堂交互同步（`docs/interaction/`）
+### 02 运行与协作
 
-- [教师交互同步 - 快速入门](./interaction/interaction-sync-quickstart.md)
-- [教师交互同步规范文档](./interaction/interaction-sync-guide.md)
+- [快速开始](./02-operations/01-quick-start.md)
+- [启动模式](./02-operations/02-run-modes.md)
+- [子模块协作流程](./02-operations/03-submodule-workflow.md)
+- [故障排查](./02-operations/04-troubleshooting.md)
 
-## 5) AI / Coze / 知识系统（`docs/ai/`）
+### 03 教师端手册
 
-- [Coze SDK 迁移说明](./ai/coze-sdk-migration.md)
-- [Coze Chat v3 API 更新说明](./ai/coze-api-v3-migration.md)
-- [知识库系统指南](./ai/knowledge-base-guide.md)
-- [知识库更新指南](./ai/knowledge-update-guide.md)
-- [Agent 系统提示词](./ai/agent-system-prompt.md)
-- [Agent 知识：语法参考](./ai/agent-knowledge-syntax.md)
-- [Agent 知识：组件参考](./ai/agent-knowledge-components.md)
-- [Agent 知识：示例集合](./ai/agent-knowledge-examples.md)
-- [Agent 知识：最佳实践](./ai/agent-knowledge-best-practices.md)
+- [教师端桌面程序](./03-teacher-guide/01-teacher-desktop.md)
+- [课件与文件管理](./03-teacher-guide/02-course-library.md)
+- [机房视图与座位表](./03-teacher-guide/03-classroom-view.md)
 
-## 6) 数据库与运维（`docs/ops/`）
+### 04 学生端手册
 
-- [SQLite 数据库安装指南](./ops/sqlite-installation.md)
-- [SQLite 向量数据库完整指南](./ops/sql-database-guide.md)
-- [日志系统文档](./ops/LOGGING.md)
+- [学生端桌面程序](./04-student-guide/01-student-desktop.md)
 
-## 7) 项目材料（`docs/project/`）
+### 05 课件开发
 
-- [参赛全套申报文档](./project/LumeSync_参赛全套文档.md)
+- [课件编写说明](./05-course-development/01-course-authoring.md)
+- [课件模板说明](./05-course-development/02-course-template.md)
+- [组件参考](./05-course-development/03-component-reference.md)
+- [课件 SDK 参考](./05-course-development/04-course-sdk.md)
+- [SDK 示例](./05-course-development/05-sdk-examples.md)
+
+### 06 课堂运行时与交互
+
+- [课堂同步机制](./06-runtime-and-interaction/01-classroom-sync.md)
+- [运行时事件说明](./06-runtime-and-interaction/02-runtime-events.md)
+
+### 07 参考资料
+
+- [API 参考](./07-reference/01-api-reference.md)
+- [API 变更记录](./07-reference/02-api-change-log.md)
+- [仓库链接](./07-reference/03-repository-links.md)
+- [术语表](./07-reference/04-glossary.md)

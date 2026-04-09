@@ -14,40 +14,40 @@ const config = {
     downloadTimeout: 60000, // 60秒
 
     // 缓存目录配置
-    cacheRoot: process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../shared/public'),
+    cacheRoot: process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../repos/teacher/shared/public'),
     libDir: process.env.LUMESYNC_LIB_DIR || path.join(
-        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../shared/public'),
+        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../repos/teacher/shared/public'),
         'lib'
     ),
     weightsDir: process.env.LUMESYNC_WEIGHTS_DIR || path.join(
-        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../shared/public'),
+        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../repos/teacher/shared/public'),
         'weights'
     ),
     imagesDir: process.env.LUMESYNC_IMAGES_DIR || path.join(
-        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../shared/public'),
+        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../repos/teacher/shared/public'),
         'images'
     ),
     webfontsDir: process.env.LUMESYNC_WEBFONTS_DIR || path.join(
-        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../shared/public'),
+        process.env.LUMESYNC_CACHE_DIR || path.join(__dirname, '../../../repos/teacher/shared/public'),
         'webfonts'
     ),
 
     // 课程目录
-    coursesDir: path.join(__dirname, '../../../shared/public/courses'),
+    coursesDir: path.join(__dirname, '../../../repos/teacher/shared/public/courses'),
 
     // 文件夹数据路径
-    folderDataPath: path.join(__dirname, '../../../shared/public/data/course-folders.json'),
+    folderDataPath: path.join(__dirname, '../../../repos/teacher/shared/public/data/course-folders.json'),
 
     // 学生提交目录
     defaultSubmissionsDir: path.join(__dirname, '../../../submissions'),
     submissionsConfigFile: path.join(__dirname, '../../../submissions-config.json'),
 
     // 座位表配置
-    classroomLayoutPath: path.join(__dirname, '../../../shared/public/data/classroom-layout-v1.json'),
+    classroomLayoutPath: path.join(__dirname, '../../../repos/teacher/shared/public/data/classroom-layout-v1.json'),
 
     // 教程文档路径
-    skillPath: path.join(__dirname, '../../../shared/docs/create-course.md'),
-    courseGuidePath: path.join(__dirname, '../../../shared/docs/course-template.md'),
+    skillPath: path.join(__dirname, '../../../docs/05-course-development/01-course-authoring.md'),
+    courseGuidePath: path.join(__dirname, '../../../docs/05-course-development/02-course-template.md'),
 
     // 日志限制
     studentLogMax: 500,
