@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(cmake:*)",
+      "Bash(where node:*)",
+      "Bash(npm run:*)",
+      "Bash(npm start:*)",
+      "Read(//c/ProgramData/LumeSync Teacher/**)",
+      "Read(//c/ProgramData/LumeSync Teacher/logs/**)",
+      "Bash(\"/c/Users/Daniel/Documents/projects/SyncClassroom/repos/teacher/build/native-vs/native/shell/Release/LumeSyncTeacherShell.exe\")",
+      "Bash(tasklist)",
+      "Bash(powershell -NoProfile -Command \"Add-Type -Name W -Namespace X -MemberDefinition '[DllImport\\(\\\\\"kernel32.dll\\\\\"\\)] public static extern uint GetLastError\\(\\);'; & \\\\\"C:/Users/Daniel/Documents/projects/SyncClassroom/repos/teacher/build/native-vs/native/shell/Release/LumeSyncTeacherShell.exe\\\\\"; Write-Host EXIT:$LASTEXITCODE\")",
+      "Bash(taskkill /F /IM \"LumeSyncTeacherShell.exe\" /T)",
+      "Bash(taskkill /F /IM \"node.exe\" /T)",
+      "Bash(cmd.exe /c taskkill /F /IM LumeSyncTeacherShell.exe /T)",
+      "Bash(cmd.exe /c taskkill /F /IM node.exe /T)",
+      "Bash(cmd.exe /c tasklist)",
+      "Bash(findstr /I \"LumeSyncTeacherShell.exe node.exe\")",
+      "Bash(python:*)",
+      "Bash(cmd.exe /c start \"\" /B \"C:\\\\Users\\\\Daniel\\\\Documents\\\\projects\\\\SyncClassroom\\\\repos\\\\teacher\\\\build\\\\native-vs\\\\native\\\\shell\\\\Release\\\\LumeSyncTeacherShell.exe\")",
+      "Bash(node server/index.js)",
+      "Bash(findstr /I \"node.exe\")",
+      "Bash(powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -or $_.Name -eq 'LumeSyncTeacherShell.exe' } | Select-Object ProcessId,Name,CommandLine | Format-List\")",
+      "Bash(netstat -ano)",
+      "Bash(cmd.exe /c tasklist /v)",
+      "Bash(findstr /I \"node.exe LumeSyncTeacherShell.exe\")",
+      "Bash(powershell -NoProfile -Command 'Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq 36992 } | Select-Object ProcessId,Name,CommandLine | Format-List')",
+      "Bash(powershell -NoProfile -Command 'Stop-Process -Id 36992 -Force')",
+      "Bash(ls -la \"/c/Users/Daniel/Documents/projects/SyncClassroom/.claude/worktrees/agent-af08f999/repos/core\"/*)",
+      "Bash(ls -la \"/c/Users/Daniel/Documents/projects/SyncClassroom/repos/core/packages\"/*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(node:*)"
+    ]
+  }
+}

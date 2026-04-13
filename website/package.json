@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "lumesync-website",
   "version": "1.0.0",
   "description": "LumeSync website and auto-publish download service",
@@ -11,5 +11,6 @@
     "axios": "^1.6.8",
     "dotenv": "^17.3.1",
     "express": "^4.19.2"
-  }
+  },
+  "packageManager": "pnpm@10.33.0"
 }

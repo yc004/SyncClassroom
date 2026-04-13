@@ -1,0 +1,8 @@
+packages:
+  - "."
+  - "website"
+  - "repos/core"
+  - "repos/core/packages/*"
+  - "repos/teacher"
+  - "repos/student"
+  - "repos/editor-plugin"

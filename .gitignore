@@ -40,3 +40,6 @@ file/
 public/lib/
 public/webfonts/
 public/weights/
+
+# Claude Code
+.claude/worktrees/

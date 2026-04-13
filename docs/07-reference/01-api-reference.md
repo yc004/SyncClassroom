@@ -103,18 +103,12 @@
 - `currentSlideIndex`
 - `mode`
 
-### 学生在线列表
-
-- `GET /api/students`
-
-### 学生日志
-
-- `GET /api/student-log`
-
 ### 已废弃数据面接口
 
-以下接口在 core 中已明确废弃，并返回 `410`：
+以下接口在 core 中已明确废弃，并返回空兼容响应或不再提供课堂状态：
 
+- `/api/students`
+- `/api/student-log`
 - `/api/courses`
 - `/api/course-status`
 - `/api/refresh-courses`
@@ -131,8 +125,8 @@
 - `select-course`
 - `sync-slide`
 - `host-settings`
-- `refresh-courses`
 - `end-course`
+- `refresh-courses`
 - `full-sync-state`
 - `interaction:sync`
 - `sync-var`
@@ -146,23 +140,35 @@
 
 - `request-sync-state`
 - `student:submit`
+- `student-alert`
+- `student-action`
 - `vote:submit`
 - `annotation:get`
-- `student-action`
-- `student-alert`
 
-### 服务端广播或回包
+### 服务端广播 / 回复
 
 - `role-assigned`
-- `course-changed`
-- `course-ended`
-- `student-status`
-- `student-alert`
-- `full-sync-state`
-- `student:submit:result`
-- `vote:result`
-- `vote:submit:ack`
-- `annotation:state`
+- `identity-rejected`
+- `participant-joined`
+- `participant-left`
+
+### 课堂域事件说明
+
+以上课堂控制、投票、标注、学生监控等事件仍可经由 Socket 转发，但它们已不再代表 core 自身持有的 UI 状态；这些语义应由 teacher / student 端各自管理。
+
+## 4. HTTP 兼容接口
+
+以下接口在 core 中仍返回兼容数据：
+
+- `GET /api/health`
+- `POST /api/session/bootstrap`
+
+其余数据面能力已迁移到教师端服务。
+
+## 5. 备注
+
+core 当前职责：连接鉴权、事件转发、运行时脚本分发。
+不再承担：课堂 UI 状态、学生监控视图、投票状态存储、标注状态存储、教师设置存储。
 
 更偏课件开发视角的说明见：
 
