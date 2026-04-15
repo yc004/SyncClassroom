@@ -32,7 +32,12 @@
       "Bash(gh api:*)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(python3:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File native/package-native.ps1)",
+      "Bash(powershell:*)",
+      "Bash(npm ls:*)",
+      "Bash(C:/Program Files/LumeSync Teacher/node.exe:*)"
     ]
   }
 }
