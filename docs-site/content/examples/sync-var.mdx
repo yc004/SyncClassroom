@@ -1,0 +1,59 @@
+---
+title: 同步变量
+description: 使用 useSyncVar 在教师端和学生端之间同步页面状态。
+---
+
+# 同步变量
+
+同步变量适合课堂中需要教师端控制、学生端跟随的状态，例如当前题目、展示答案或步骤开关。当前教师端只有在 `syncInteraction` 开启时才会转发 `sync-var`。
+
+## 页面示例
+
+```tsx
+import React from 'react'
+import { CourseGlobalContext } from '@lumesync/course-sdk'
+
+export default function SyncVarDemo() {
+  const ctx = React.useContext(CourseGlobalContext)
+  const [step, setStep] = ctx.useSyncVar('demo-step', 1)
+
+  return (
+    <main style={{ padding: 48 }}>
+      <h1>同步步骤：{step}</h1>
+      {ctx.isHost ? (
+        <button onClick={() => setStep((current) => current + 1)}>
+          下一步
+        </button>
+      ) : (
+        <p>等待教师端切换步骤。</p>
+      )}
+    </main>
+  )
+}
+```
+
+## manifest 片段
+
+```json
+{
+  "pages": [
+    {
+      "id": "sync-var",
+      "title": "同步变量",
+      "file": "slides/SyncVarDemo.tsx"
+    }
+  ]
+}
+```
+
+## 常见错误
+
+- 没有开启教师端同步交互。
+- 在学生端调用只有 host 才应该触发的控制逻辑。
+- 使用不稳定的 key，导致每次渲染都创建不同同步变量。
+
+## 下一步阅读
+
+- [课堂同步](/concepts/classroom-sync)
+- [Socket 事件](/api/socket)
+- [学生提交示例](/examples/submission)

@@ -1,0 +1,71 @@
+---
+title: 教师端工作流
+description: 从当前教师端源码理解课程、课堂、学生和提交的运行流程。
+---
+
+# 教师端工作流
+
+教师端是课堂运行的控制面。它负责选择课程、同步页码、管理学生连接、收集提交并导出课件。
+
+## 启动阶段
+
+教师端服务启动时会：
+
+1. 读取 `server/src/config.js` 中定义的目录和环境变量。
+2. 自动生成缺失的 host token 和 viewer token secret。
+3. 构建教师端 bundle 和 render engine bundle。
+4. 挂载课程、组件、engine 和缓存资源目录。
+5. 注册 HTTP API 和 Socket.IO 事件。
+
+## 课程管理
+
+教师端通过 `/api/courses` 读取课程目录，通过 `/api/refresh-courses` 重新扫描课程。课程文件夹 API 支持创建、删除、重命名、移动文件夹，以及把课程移动到文件夹。
+
+选择课程时，host 通过 `select-course` 事件通知服务端。服务端会缓存课程依赖并向学生端广播 `course-changed`。
+
+## 课堂布局
+
+当前教师端支持课堂座位布局：
+
+- 通过 `/api/classroom-layout` 读取。
+- 通过 `/api/save-classroom-layout` 保存。
+- 教师端 UI 还维护多课堂布局 localStorage，并兼容旧的 `classroom-layout-v1` 数据。
+
+## 学生监控
+
+学生连接后，教师端会收到在线状态。当前源码可确认的监控能力包括：
+
+- 学生加入/离开提醒。
+- 全屏退出和标签页隐藏上报。
+- 学生截图状态与截图数据上报。
+- `student-action` 操作日志。
+
+截图数据有大小和格式限制，当前服务端只接受 `data:image/jpeg;base64,`，并限制图片尺寸和广播频率。
+
+## 提交收集
+
+课件可以通过 `submitContent` 发送 `student:submit`。服务端转发给 hosts，host 回写 `student:submit:ack` 后，服务端广播 `student:submit:result`。
+
+HTTP 层还提供：
+
+- `POST /api/save-submission`
+- `GET /api/submissions/:courseId`
+- `GET /api/submissions/:courseId/file/:fileName(*)`
+- `POST /api/submissions/:courseId/download-batch`
+
+## 导出
+
+教师端支持：
+
+```text
+GET /api/export-course/:courseId?format=pdf
+GET /api/export-course/:courseId?format=lume
+```
+
+PDF 导出和 `.lume` 导出依赖当前课程文件和 render engine 能力。导出失败时先检查课程 manifest、页面文件和资源路径。
+
+## 下一步阅读
+
+- [HTTP API](/api/http)
+- [Socket 事件](/api/socket)
+- [学生提交示例](/examples/submission)

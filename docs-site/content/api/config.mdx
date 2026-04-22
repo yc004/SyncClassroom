@@ -1,0 +1,99 @@
+---
+title: 配置项
+description: 当前源码中可确认的脚本、环境变量、教师端设置和插件配置。
+---
+
+# 配置项
+
+本页只记录最新源码中能确认的配置入口。没有源码依据的部署参数会标为 TODO，而不是补成假配置。
+
+## 根脚本
+
+| 脚本 | 说明 |
+| --- | --- |
+| `repos:init` | 初始化并更新 submodule |
+| `repos:update` | 更新 submodule |
+| `start:teacher-server` | 启动教师端 Node 服务 |
+| `start:teacher` | 启动教师端桌面壳 |
+| `start:student` | 启动学生端桌面壳 |
+| `start:core` | 启动 `repos/teacher/core` server |
+| `start:ai-editor` | 启动 Vite AI Editor |
+| `docs:dev` | 启动 Nextra 文档站 |
+| `docs:build` | 构建文档站 |
+
+`start:ai-service` 当前指向缺失目录，暂不作为有效脚本推荐。
+
+## 教师端服务环境变量
+
+| 名称 | 默认值 | 说明 |
+| --- | --- | --- |
+| `PORT` | `3000` | 教师端服务端口 |
+| `LUMESYNC_PUBLIC_DIR` | 自动解析 | 静态 public 目录 |
+| `STATIC_DIR` | 自动解析 | 兼容静态目录 |
+| `LUMESYNC_DOCS_ROOT` | 自动解析 | 文档/教程根目录 |
+| `LUMESYNC_CACHE_DIR` | 自动解析 | 依赖缓存根目录 |
+| `LUMESYNC_LIB_DIR` | cache 下目录 | 缓存库文件目录 |
+| `LUMESYNC_WEIGHTS_DIR` | cache 下目录 | 模型权重目录 |
+| `LUMESYNC_IMAGES_DIR` | cache 下目录 | 图片缓存目录 |
+| `LUMESYNC_WEBFONTS_DIR` | cache 下目录 | 字体缓存目录 |
+| `LUMESYNC_COURSES_DIR` | 自动解析 | 课程目录 |
+| `LUMESYNC_FOLDER_DATA_PATH` | 自动解析 | 课程文件夹数据 |
+| `LUMESYNC_CLASSROOM_LAYOUT_PATH` | 自动解析 | 座位表数据 |
+| `LUMESYNC_SUBMISSIONS_DIR` | 自动解析 | 学生提交目录 |
+| `LUMESYNC_SUBMISSIONS_CONFIG` | 自动解析 | 提交配置文件 |
+| `LUMESYNC_SKILL_PATH` | 自动解析 | Skill 下载文件 |
+| `LUMESYNC_COURSE_GUIDE_PATH` | 自动解析 | 课件教程文件 |
+| `LUMESYNC_STUDENT_LOG_MAX` | 源码默认 | 学生日志最大长度 |
+| `LUMESYNC_ANNOTATION_MAX_SEGMENTS_PER_SLIDE` | 源码默认 | 单页标注段数上限 |
+| `LUMESYNC_SERVER_PID_FILE` | 未固定 | 服务 PID 文件 |
+
+## 身份与 token
+
+| 名称 | 说明 |
+| --- | --- |
+| `LUMESYNC_HOST_TOKEN` | host/teacher token |
+| `LUMESYNC_VIEWER_TOKEN_SECRET` | viewer token secret |
+| `LUMESYNC_VIEWER_TOKEN_TTL_SEC` | viewer token 有效期 |
+| `LUMESYNC_HOST_TOKEN_TTL_SEC` | host token 有效期 |
+| `LUMESYNC_IDENTITY_LEGACY_COMPAT` | core runtime-control legacy 身份兼容开关 |
+
+教师端服务缺少 token 时会自动生成默认值。core runtime-control 更适合显式配置 token/secret。
+
+## core 与 engine 路径
+
+| 名称 | 说明 |
+| --- | --- |
+| `LUMESYNC_CORE_DIR` | 覆盖 core 目录解析 |
+| `LUMESYNC_ENGINE_DIR` | 覆盖 render engine 源码/静态目录解析 |
+
+## 教师端默认设置
+
+```js
+{
+  forceFullscreen: false,
+  syncFollow: true,
+  syncInteraction: false,
+  allowInteract: true,
+  podiumAtTop: true,
+  renderScale: 0.96,
+  uiScale: 1.0,
+  alertJoin: true,
+  alertLeave: true,
+  alertFullscreenExit: true,
+  alertTabHidden: true,
+  monitorEnabled: false,
+  monitorIntervalSec: 1
+}
+```
+
+`monitorIntervalSec` 会限制在 `0.5` 到 `5` 秒，并按 0.5 秒步进归一化。
+
+## VS Code 插件配置
+
+`repos/editor-plugin/package.json` 中声明的配置前缀是 `lumesynceditor`，包括服务端口、打开时自动预览和预览缩放等选项。源码中还读取了 `lumesync.preview.kernel` 与 `lumesync.course.slideTabs.enabled`，这部分命名需要后续统一。
+
+## 下一步阅读
+
+- [HTTP API](/api/http)
+- [Socket 事件](/api/socket)
+- [排障](/guides/troubleshooting)

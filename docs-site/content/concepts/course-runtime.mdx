@@ -1,0 +1,101 @@
+---
+title: 课件运行时
+description: 理解当前 render engine 如何加载 .lume、PDF 和兼容脚本课程。
+---
+
+# 课件运行时
+
+课件运行时负责把课程文件转换成可渲染的 React 页面，并把页面接入课堂上下文。当前主格式是 Zip `.lume` 包，运行时入口由 `LumeSyncRenderEngine` 暴露。
+
+## 支持的课程来源
+
+| 来源 | 当前状态 | 说明 |
+| --- | --- | --- |
+| Zip `.lume` | 推荐 | 包含 `manifest.json`、`pages` 和 `assets` |
+| PDF | 支持 | 通过 PDF.js 渲染页面 |
+| 普通脚本课程 | 兼容 | 脚本加载后需要提供 `window.CourseData` |
+| 旧单文件 `.lume` | 不支持播放 | 运行时会提示迁移到 Zip manifest 格式 |
+
+## Zip .lume 加载流程
+
+```text
+.lume Zip
+  -> manifest.json
+  -> runtime.format = lumesync-zip
+  -> pages[].file
+  -> TSX/JSX page module
+  -> React slide
+```
+
+manifest 中每个页面至少需要 `file`：
+
+```json
+{
+  "runtime": {
+    "format": "lumesync-zip",
+    "entryMode": "pages"
+  },
+  "pages": [
+    { "id": "intro", "title": "Intro", "file": "slides/Intro.tsx" }
+  ]
+}
+```
+
+## 页面导入限制
+
+当前浏览器运行时可以解析这些导入：
+
+- `react`
+- `react-dom`
+- `@lumesync/course-sdk`
+- `lumesync-course-sdk`
+
+其它 npm 包不会在播放时自动安装。需要使用外部库时，优先通过课件 manifest 的依赖声明和教师端依赖缓存链路处理。
+
+## CourseGlobalContext
+
+课件页面可以通过 `@lumesync/course-sdk` 访问课堂上下文：
+
+```tsx
+import { CourseGlobalContext } from '@lumesync/course-sdk'
+import React from 'react'
+
+export default function Slide() {
+  const ctx = React.useContext(CourseGlobalContext)
+  const [value, setValue] = ctx.useSyncVar('answer', '')
+
+  return <input value={value} onChange={(event) => setValue(event.target.value)} />
+}
+```
+
+当前实现中可确认的能力包括同步变量、本地变量、学生信息、学生提交、投票工具栏状态和 socket 访问。源码里还存在 camera 与交互同步相关实现，但公开类型文件尚未完整声明，文档中暂按待补充 API 处理。
+
+## Render Engine API
+
+`LumeSyncRenderEngine` 当前暴露：
+
+- `loadCourse`
+- `renderCourseStage`
+- `renderCourseExportDocument`
+- `buildCourseDataFromMemory`
+- `createCourseContext`
+- `createExportCourseContext`
+- `CourseStage`
+- `CourseExportDocument`
+- `CourseErrorBoundary`
+- `PdfPageSlide`
+- `WebPageSlide`
+
+这些 API 主要被教师端 shell、AI Editor 预览和导出流程使用。
+
+## 常见错误
+
+- 把旧单文件 `.lume` 当作当前课件格式。
+- 在页面里导入任意 npm 包，导致浏览器运行时无法解析。
+- 资源放在 Zip 中但没有使用 `assets/...` 路径。
+
+## 下一步阅读
+
+- [第一个课件示例](/getting-started/first-example)
+- [课件 SDK](/api/sdk)
+- [课件开发指南](/guides/course-authoring)

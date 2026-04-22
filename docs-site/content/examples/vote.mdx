@@ -1,0 +1,52 @@
+---
+title: 投票组件
+description: 使用 VoteSlide 创建课堂即时投票。
+---
+
+# 投票组件
+
+投票适合在讲解过程中快速收集选择题答案。当前服务端会限制投票时长、选项数量，并按学生 IP 防重复提交。
+
+## 页面示例
+
+```tsx
+import React from 'react'
+import { VoteSlide } from '@lumesync/course-sdk'
+
+export default function VoteDemo() {
+  return (
+    <VoteSlide
+      config={{
+        id: 'react-return-value',
+        question: 'React 组件通常返回什么？',
+        options: [
+          { id: 'a', label: '字符串路径' },
+          { id: 'b', label: 'React 元素' },
+          { id: 'c', label: '数据库连接' }
+        ],
+        anonymous: false,
+        theme: 'light'
+      }}
+    />
+  )
+}
+```
+
+## 运行限制
+
+- 选项至少 2 个。
+- `durationSec` 会被限制到 10 到 300 秒。
+- 同一学生 IP 只能提交一次。
+- 匿名投票会影响学生端可见结果。
+
+## 常见错误
+
+- 多个投票页复用同一个 `id`。
+- 选项没有稳定 `id`。
+- 期望学生端直接修改投票配置；投票启动由教师端控制。
+
+## 下一步阅读
+
+- [Socket 事件](/api/socket)
+- [课件 SDK](/api/sdk)
+- [同步变量示例](/examples/sync-var)

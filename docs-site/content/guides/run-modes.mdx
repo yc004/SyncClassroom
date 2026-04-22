@@ -1,0 +1,79 @@
+---
+title: 运行模式
+description: 选择适合当前开发任务的 LumeSync（萤火课堂）启动方式。
+---
+
+# 运行模式
+
+不同任务需要启动不同模块。优先启动最小必要进程，可以减少桌面壳、原生构建和课程数据面的干扰。
+
+## 教师端服务模式
+
+适合调试 HTTP API、Socket 事件、课程目录、提交、导出和 render engine 静态资源。
+
+```bash
+pnpm run start:teacher-server
+```
+
+服务会挂载 `/api`、`/api/teacher`、`/courses`、`/engine`、`/teacher-app.js` 和 `/render-engine.js`。
+
+## 教师端桌面模式
+
+适合验证完整教师端体验，包括窗口、课堂布局、课程选择和学生监控。
+
+```bash
+pnpm run start:teacher
+```
+
+该模式依赖 Windows 原生 shell 构建产物。没有 `.exe` 时先不要用它排查 Web 逻辑。
+
+## 学生端桌面模式
+
+适合验证学生机连接、离线页、提交和监控行为。
+
+```bash
+pnpm run start:student
+```
+
+当前启动脚本会查找 `build/native-vs/native/shell/Release/LumeSyncStudentShell.exe`。
+
+## core runtime 模式
+
+适合验证公共运行时、身份校验和通用事件转发。
+
+```bash
+pnpm run start:core
+```
+
+core server 返回的是 runtime 兼容接口，不托管完整教师端课程数据面。
+
+## AI Editor 模式
+
+适合创建、打开、预览和导出 Zip `.lume` 包。
+
+```bash
+pnpm run start:ai-editor
+```
+
+AI Editor 在浏览器中用 JSZip 读写 `.lume`，并从 `@lumesync/core/browser-runtime` 加载 render engine 源码进行预览。
+
+## VS Code 插件模式
+
+适合调试 `.lume` 自定义编辑器、命令和本地预览服务。插件入口在 `repos/editor-plugin`，命令包括：
+
+- `lumesynceditor.openEditor`
+- `lumesynceditor.previewActiveFile`
+- `lumesynceditor.openLegacyPreview`
+- `lumesynceditor.stopServer`
+
+插件会启动本地预览服务，并把 `.lume` 镜像到扩展内 preview 目录。
+
+## 当前不推荐的脚本
+
+根脚本存在 `start:ai-service`，但当前仓库没有对应服务目录。除非补回该服务，否则它应视为待修复脚本。
+
+## 下一步阅读
+
+- [快速开始](/getting-started/quick-start)
+- [配置项](/api/config)
+- [排障](/guides/troubleshooting)

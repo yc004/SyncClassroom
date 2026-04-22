@@ -1,0 +1,117 @@
+---
+title: Socket 事件
+description: 教师端课堂协议和 core runtime-control 当前可确认的 Socket.IO 事件。
+---
+
+# Socket 事件
+
+Socket.IO 负责课堂实时同步。教师端服务有完整课堂协议，core runtime-control 有通用 host/viewer 事件转发协议。
+
+## 教师端连接
+
+连接成功后，服务端发送：
+
+```ts
+type RoleAssigned = {
+  role: 'host' | 'viewer'
+  clientIp: string
+  clientId: string
+  currentCourseId: string | null
+  currentSlideIndex: number
+  hostSettings: HostSettings
+  courseCatalog: unknown
+}
+```
+
+默认教师端设置包括 `syncFollow: true`、`syncInteraction: false`、`allowInteract: true`、`monitorEnabled: false` 和 `monitorIntervalSec: 1`。
+
+## 教师端事件
+
+| 事件 | 方向 | 说明 |
+| --- | --- | --- |
+| `select-course` | host -> server -> viewers | 选择课程，缓存依赖并广播 `course-changed` |
+| `sync-slide` | host -> server -> viewers | 同步页码 |
+| `update-settings` | host -> server -> viewers | 兼容设置更新 |
+| `host-settings` | host -> server -> all | 更新教师端设置 |
+| `refresh-courses` | host -> server -> hosts | 刷新课程目录 |
+| `end-course` | host -> server -> all | 结束当前课程 |
+| `register-dependencies` | client -> server | 注册课件依赖映射 |
+| `set-admin-password` | host -> server | 设置管理密码 |
+| `full-sync-state` | host -> server -> viewers | 发送完整同步状态 |
+| `interaction:sync` | host -> server -> viewers | 同步教师端交互 |
+| `sync-var` | host -> server -> viewers | 同步变量，要求 `syncInteraction` 为真 |
+
+## 学生端事件
+
+| 事件 | 方向 | 说明 |
+| --- | --- | --- |
+| `request-sync-state` | viewer -> server -> hosts | 请求完整状态 |
+| `student-alert` | viewer -> server -> hosts | 上报全屏退出、标签页隐藏等行为 |
+| `student:screenshot` | viewer -> server -> hosts | 上报截图 |
+| `student:submit` | viewer -> server -> hosts | 提交内容 |
+| `student-action` | viewer -> server | 记录学生操作 |
+| `annotation:get` | viewer -> server | 请求当前页标注 |
+
+`student:submit` 需要 host ack。服务端随后广播 `student:submit:result`。
+
+```ts
+type StudentSubmitPayload = {
+  submissionId: string
+  courseId: string
+  content: string | object
+  fileName?: string
+  mergeFile?: boolean
+}
+```
+
+## 投票事件
+
+| 事件 | 说明 |
+| --- | --- |
+| `vote:start` | 教师端开始投票 |
+| `vote:submit` | 学生提交投票 |
+| `vote:submit:ack` | 服务端确认学生提交 |
+| `vote:result` | 广播统计结果 |
+| `vote:end` | 教师端结束投票 |
+
+限制：
+
+- `durationSec` 会被限制在 10 到 300 秒。
+- 选项至少 2 个。
+- 当前按 `clientIp` 防重复提交。
+- 匿名投票会影响学生端收到的结果内容。
+
+## 标注事件
+
+| 事件 | 说明 |
+| --- | --- |
+| `annotation:segment` | 实时线段转发 |
+| `annotation:stroke` | 完成一笔并缓存 |
+| `annotation:clear` | 清空当前页标注 |
+| `annotation:get` | 获取当前页标注 |
+| `annotation:state` | 返回标注状态 |
+| `annotation-add` | 兼容旧事件 |
+| `annotation-load` | 兼容旧事件 |
+
+## core runtime-control
+
+core runtime-control 使用 `socket.onAny` 转发非保留事件：
+
+- host 发出的事件广播给其它连接。
+- viewer 发出的事件转发给 hosts。
+- payload 中有 `targetId` 时可定向发送，并在转发时移除 `targetId`。
+
+保留或服务端事件包括：
+
+- `role-assigned`
+- `identity-rejected`
+- `participant-joined`
+- `participant-left`
+
+配置 `LUMESYNC_IDENTITY_LEGACY_COMPAT=false` 后，缺少明确身份信息的连接会被拒绝。
+
+## 下一步阅读
+
+- [课堂同步](/concepts/classroom-sync)
+- [课件 SDK](/api/sdk)
+- [投票组件示例](/examples/vote)

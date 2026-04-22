@@ -1,0 +1,79 @@
+---
+title: 排障
+description: 根据当前源码整理的常见问题和定位路径。
+---
+
+# 排障
+
+本页按开发中最常见的失败点组织。先确认启动模式和真实路径，再看具体报错。
+
+## core 路径不对
+
+现象：脚本或文档引用 `repos/core`。
+
+处理：当前 core 在 `repos/teacher/core`。执行：
+
+```bash
+pnpm run repos:init
+pnpm run start:core
+```
+
+## 旧 .lume 无法播放
+
+现象：运行时提示旧单文件 `.lume` 需要迁移。
+
+处理：把课件迁移为 Zip 格式：
+
+```text
+manifest.json
+slides/*.tsx
+assets/*
+```
+
+`manifest.json` 中需要 `runtime.format: "lumesync-zip"`。
+
+## 同步变量没有同步到学生端
+
+现象：`useSyncVar` 在教师端变化，但学生端不更新。
+
+检查：
+
+- socket 角色是否是 `host`。
+- 教师端设置 `syncInteraction` 是否为 `true`。
+- 学生端是否已收到 `role-assigned` 和当前课程。
+
+当前教师端默认 `syncInteraction: false`。
+
+## 学生端启动找不到 exe
+
+现象：`pnpm run start:student` 找不到 `LumeSyncStudentShell.exe`。
+
+处理：学生端脚本依赖 Windows 原生构建产物。没有构建桌面壳时，先调试教师端服务、core 或 AI Editor。
+
+## core viewer bootstrap 失败
+
+现象：`POST /api/session/bootstrap` 请求 viewer token 失败。
+
+处理：core server 的 viewer bootstrap 需要 `LUMESYNC_VIEWER_TOKEN_SECRET`。教师端服务会自动生成缺失 token，但 core 更偏运行时验证，建议显式配置。
+
+## 课件资源丢失
+
+现象：图片或视频在 AI Editor 能看到，播放时缺失。
+
+检查：
+
+- 资源是否在 Zip 的 `assets/` 目录。
+- 页面引用是否使用 `assets/...`。
+- manifest 的 `assets` 是否和实际文件一致。
+
+## 依赖加载失败
+
+现象：课件使用外部库时报错。
+
+处理：当前页面导入只明确支持 React、ReactDOM 和 LumeSync course SDK。外部库需要通过 manifest 依赖声明和教师端 script-cache 处理，不能假设运行时会安装 npm 包。
+
+## 下一步阅读
+
+- [配置项](/api/config)
+- [课件运行时](/concepts/course-runtime)
+- [运行模式](/guides/run-modes)

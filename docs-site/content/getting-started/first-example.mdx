@@ -1,0 +1,99 @@
+---
+title: 第一个课件示例
+description: 用当前 Zip 格式 .lume 包创建一个最小可播放课件。
+---
+
+# 第一个课件示例
+
+当前运行时优先支持 Zip 格式 `.lume` 包：根目录包含 `manifest.json`，页面文件放在 `slides/` 或 manifest 指定的位置，资源放在 `assets/`。本页给出一个最小示例，帮助你理解运行时真正读取的文件结构。
+
+## 文件结构
+
+```text
+hello.lume
+├─ manifest.json
+└─ slides/
+   └─ Intro.tsx
+```
+
+`.lume` 本质是 Zip 包。AI Editor 和 VS Code 插件会按这种结构读写课件。
+
+## manifest.json
+
+```json
+{
+  "schemaVersion": 1,
+  "title": "Hello LumeSync",
+  "runtime": {
+    "format": "lumesync-zip",
+    "entryMode": "pages",
+    "react": "18",
+    "slideModule": "tsx"
+  },
+  "preferredAspectRatio": "16:9",
+  "pages": [
+    {
+      "id": "intro",
+      "title": "第一节",
+      "file": "slides/Intro.tsx"
+    }
+  ],
+  "assets": []
+}
+```
+
+`runtime.format` 必须是 `lumesync-zip`。`entryMode: "pages"` 表示运行时会按 `pages[].file` 加载页面模块。
+
+## slides/Intro.tsx
+
+```tsx
+import React from 'react'
+
+export default function Intro() {
+  return (
+    <section style={{ padding: 48, fontFamily: 'sans-serif' }}>
+      <h1>Hello LumeSync</h1>
+      <p>这是一页可以被 LumeSync render engine 加载的课件页面。</p>
+    </section>
+  )
+}
+```
+
+页面模块可以导出 React 组件。当前运行时支持从 `react`、`react-dom`、`@lumesync/course-sdk` 或 `lumesync-course-sdk` 导入；其它裸模块导入不会被自动解析。
+
+## 添加资源
+
+把图片放入 `assets/` 并在 manifest 中登记，或让运行时从 Zip 内的 `assets/` 目录发现资源：
+
+```text
+hello.lume
+├─ manifest.json
+├─ slides/Intro.tsx
+└─ assets/cover.png
+```
+
+页面内可以使用相对路径：
+
+```tsx
+export default function Intro() {
+  return <img src="assets/cover.png" alt="课程封面" />
+}
+```
+
+运行时会把 `src`、`href` 和 `poster` 中的 `assets/...` 重写为可访问的对象 URL。
+
+## 兼容格式说明
+
+当前 render engine 仍保留非 Zip 脚本课程的回退加载逻辑，脚本需要暴露 `window.CourseData`。但旧的单文件 `.lume` 已被明确拒绝播放，并提示迁移到 Zip manifest 格式。
+
+## 常见错误
+
+- `manifest.json` 缺失：运行时无法识别 `.lume` 包。
+- `pages[].file` 指向不存在的文件：页面会加载失败。
+- 从未支持的包名导入：当前浏览器运行时不会自动安装 npm 依赖。
+
+## 下一步阅读
+
+- [课件开发指南](/guides/course-authoring)
+- [课件运行时](/concepts/course-runtime)
+- [课件 SDK](/api/sdk)

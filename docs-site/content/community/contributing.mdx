@@ -1,0 +1,70 @@
+---
+title: 贡献指南
+description: 在 LumeSync（萤火课堂）仓库中安全地修改代码和文档。
+---
+
+# 贡献指南
+
+本页帮助团队成员判断修改范围、运行验证命令，并把文档和源码保持一致。LumeSync（萤火课堂）包含多个子模块，提交前应确认改动落在正确目录。
+
+## 开始前
+
+```bash
+pnpm run repos:init
+pnpm install
+```
+
+确认当前工作区状态：
+
+```bash
+git status --short --ignore-submodules=all
+git submodule status
+```
+
+## 修改范围
+
+| 任务 | 推荐目录 |
+| --- | --- |
+| 教师端 API / Socket | `repos/teacher/server` |
+| 教师端 UI | `repos/teacher/shared/teacher-shell/src` |
+| render engine / SDK | `repos/teacher/core` |
+| 学生端 | `repos/student` |
+| AI Editor | `repos/ai-editor` |
+| VS Code 插件 | `repos/editor-plugin` |
+| 文档 | `docs-site/content` |
+
+## 验证命令
+
+按改动范围选择最小验证集：
+
+```bash
+pnpm run start:teacher-server
+pnpm run start:core
+pnpm run start:ai-editor
+pnpm run docs:build
+```
+
+如果改动桌面壳，还需要执行对应包里的 native build/package 脚本。具体 Windows 构建矩阵仍待补充。
+
+## 文档要求
+
+改动 API、Socket、课件格式、配置项或启动脚本时，同步更新：
+
+- [HTTP API](/api/http)
+- [Socket 事件](/api/socket)
+- [配置项](/api/config)
+- [课件运行时](/concepts/course-runtime)
+- [排障](/guides/troubleshooting)
+
+## 提交建议
+
+- 不要混合无关子模块的大改动。
+- 不要直接改构建产物来替代源码修改。
+- 涉及 `.lume` 格式变化时，补充迁移说明和最小示例。
+- 涉及学生端或教师端桌面壳时，说明是否验证过 Windows 原生构建。
+
+## 下一步阅读
+
+- [仓库边界](/concepts/repo-boundaries)
+- [运行模式](/guides/run-modes)
+- [Changelog](/reference/changelog)

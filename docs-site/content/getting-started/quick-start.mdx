@@ -1,0 +1,113 @@
+---
+title: 快速开始
+description: 用最短路径安装依赖并启动 LumeSync（萤火课堂）的主要运行模式。
+---
+
+# 快速开始
+
+本页用于把仓库跑起来，并说明每个启动命令对应的当前实现。LumeSync（萤火课堂）是 pnpm workspace + Git submodule 项目，核心代码分布在教师端、学生端、core 运行时、AI Editor 和 VS Code 插件中。
+
+## 前置要求
+
+- Node.js 与 pnpm，根仓库声明的包管理器为 `pnpm@10.33.0`
+- Git submodule 可用
+- Windows 桌面壳构建需要 Visual Studio 2022、CMake、WebView2 Runtime 和 PowerShell
+
+桌面壳不是文档站运行的前置条件。只调试 Web 服务、core 或 AI Editor 时，通常只需要 Node.js 和 pnpm。
+
+## 克隆并初始化
+
+```bash
+git clone --recurse-submodules https://github.com/yc004/SyncClassroom.git
+cd SyncClassroom
+pnpm run repos:init
+pnpm install
+```
+
+如果已经克隆但缺少 `repos/teacher`、`repos/student` 或 `repos/teacher/core` 文件，重新同步子模块：
+
+```bash
+pnpm run repos:init
+```
+
+## 启动教师端服务
+
+教师端服务是课堂数据面的主入口，负责课程扫描、课件导出、座位表、学生连接、投票和提交收集。
+
+```bash
+pnpm run start:teacher-server
+```
+
+默认服务地址通常是：
+
+```text
+http://localhost:3000
+```
+
+可以用健康检查确认服务状态：
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+## 启动教师端桌面壳
+
+教师端桌面壳会启动本地服务并打开教师端界面。它依赖 Windows 原生构建产物，未构建时可能找不到可执行文件。
+
+```bash
+pnpm run start:teacher
+```
+
+如果只是调试 API 或课件渲染，优先使用 `start:teacher-server`。
+
+## 启动学生端
+
+学生端用于连接教师机，接收当前课程、页码和互动事件。源码中的启动脚本会尝试运行已构建的 Windows 学生端壳。
+
+```bash
+pnpm run start:student
+```
+
+学生端配置中常见教师端地址形式：
+
+```text
+http://<teacher-ip>:3000
+```
+
+## 启动 core 运行时服务
+
+core 位于 `repos/teacher/core`，提供独立的运行时控制、身份校验和 render engine 静态资源。它不负责托管完整课程目录。
+
+```bash
+pnpm run start:core
+```
+
+## 启动 AI Editor
+
+AI Editor 是 Vite React 应用，用于创建、打开、预览和导出 Zip 格式 `.lume` 包。
+
+```bash
+pnpm run start:ai-editor
+```
+
+根脚本中存在 `start:ai-service`，但当前仓库没有找到对应的 `repos/ai-editor/services/lumesync-ai-service` 目录。除非后续补回该服务，否则不要把它作为默认启动路径。
+
+## 常见错误
+
+### `repos/teacher/core` 不存在
+
+当前 core 包真实路径是 `repos/teacher/core`，不是旧文档中的 `repos/core`。执行：
+
+```bash
+pnpm run repos:init
+```
+
+### 学生端或教师端桌面壳启动失败
+
+桌面启动脚本依赖已构建的 Windows 可执行文件。先使用 `start:teacher-server` 或 `start:ai-editor` 验证 Web 侧逻辑，再补齐原生构建环境。
+
+## 下一步阅读
+
+- [安装](/getting-started/installation)
+- [第一个课件示例](/getting-started/first-example)
+- [运行模式](/guides/run-modes)
