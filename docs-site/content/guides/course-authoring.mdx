@@ -1,0 +1,98 @@
+---
+title: 课件开发
+description: 编写符合当前运行时的 Zip .lume 课件。
+---
+
+# 课件开发
+
+当前课件开发应围绕 Zip `.lume` 包展开。先定义 manifest，再编写页面模块，最后把资源放入 `assets/` 并在 AI Editor、VS Code 插件或教师端中预览。
+
+## 最小 manifest
+
+```json
+{
+  "schemaVersion": 1,
+  "title": "函数入门",
+  "runtime": {
+    "format": "lumesync-zip",
+    "entryMode": "pages",
+    "react": "18",
+    "slideModule": "tsx"
+  },
+  "preferredAspectRatio": "16:9",
+  "pages": [
+    {
+      "id": "intro",
+      "title": "什么是函数",
+      "file": "slides/Intro.tsx"
+    }
+  ],
+  "assets": []
+}
+```
+
+运行时会按 `pages[].file` 读取页面。`legacy-course-data` 入口模式在源码中存在，但新课件应优先使用 `pages`。
+
+## 页面模块
+
+```tsx
+import React from 'react'
+import { CourseGlobalContext } from '@lumesync/course-sdk'
+
+export default function Intro() {
+  const ctx = React.useContext(CourseGlobalContext)
+  const student = ctx.getStudentInfo()
+
+  return (
+    <main style={{ padding: 48 }}>
+      <h1>什么是函数</h1>
+      <p>当前学生：{student?.name ?? '未命名学生'}</p>
+    </main>
+  )
+}
+```
+
+页面应该导出 React 组件。不要依赖运行时未声明支持的 npm 包导入。
+
+## 使用资源
+
+```text
+assets/chart.png
+slides/Intro.tsx
+manifest.json
+```
+
+```tsx
+export default function Intro() {
+  return <img src="assets/chart.png" alt="函数图像" />
+}
+```
+
+render engine 会重写 `assets/...` URL，确保 Zip 内资源可以在浏览器中显示。
+
+## 声明依赖
+
+教师端服务的 script-cache 支持从课程 manifest 读取依赖声明，并缓存常见 CDN 资源。源码中已知处理 Tailwind、React、ReactDOM、Babel、JSZip、PDF.js、KaTeX、lodash、marked、dayjs、Chart.js、face-api 等资源。
+
+依赖声明格式仍建议以当前实现为准，新增依赖时应同步补充文档和测试。
+
+## 内置互动能力
+
+课件可以使用：
+
+- `useSyncVar`：教师端开启同步交互后向学生端同步状态。
+- `useLocalVar`：页面本地状态。
+- `submitContent`：学生提交内容到教师端。
+- `VoteSlide`、`SurveySlide`、`WebPageSlide`：运行时内置组件。
+
+## 常见错误
+
+- 只写页面文件但没有 manifest。
+- 在 `.lume` 外部引用本地图片路径。
+- 使用 `window.CourseData` 写新课件。它只是兼容路径，不是当前推荐格式。
+
+## 下一步阅读
+
+- [第一个课件示例](/getting-started/first-example)
+- [课件 SDK](/api/sdk)
+- [示例总览](/examples)

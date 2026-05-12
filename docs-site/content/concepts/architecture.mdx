@@ -1,0 +1,77 @@
+---
+title: 系统架构
+description: 从最新源码理解 LumeSync（萤火课堂）的主要进程、包和数据流。
+---
+
+# 系统架构
+
+LumeSync（萤火课堂）不是单一前端应用，而是一组围绕课堂运行的本地服务、桌面宿主和课件运行时。理解边界可以避免把教师端服务、core 运行时和编辑器职责混在一起。
+
+## 主要模块
+
+| 模块 | 路径 | 当前职责 |
+| --- | --- | --- |
+| 教师端服务 | `repos/teacher/server` | HTTP API、Socket.IO、课程目录、提交、导出、座位表、课堂状态 |
+| 教师端 shell | `repos/teacher/shared/teacher-shell` | 教师端 UI 源码，加载 `/render-engine.js` 渲染课件 |
+| core | `repos/teacher/core` | 公共运行时、render engine 源码、独立 runtime-control server |
+| 学生端 | `repos/student` | 学生端 Windows shell、host UI、教师机连接配置 |
+| AI Editor | `repos/ai-editor` | 创建、打开、预览和导出 Zip `.lume` 包 |
+| VS Code 插件 | `repos/editor-plugin` | `.lume` 自定义编辑器、本地预览服务、命令入口 |
+| 文档站 | `docs-site` | Nextra 文档 |
+
+## 教师端服务数据流
+
+教师端服务启动后会：
+
+1. 读取路径和环境变量配置。
+2. 构建教师端 bundle 和 render engine bundle。
+3. 挂载 `/courses`、`/components`、`/engine`、`/teacher-app.js`、`/render-engine.js` 等静态资源。
+4. 同时在 `/api` 和 `/api/teacher` 挂载教师端 HTTP API。
+5. 通过 Socket.IO 维护 host/viewer 连接、当前课程、当前页码、投票、标注、截图和学生提交。
+
+```text
+Teacher Shell
+  -> Teacher Server HTTP API
+  -> Socket.IO host events
+  -> /render-engine.js
+
+Student Shell
+  -> Teacher Server static pages
+  -> Socket.IO viewer events
+  -> course render engine
+```
+
+## core 的位置
+
+`@lumesync/core` 位于 `repos/teacher/core`。它提供两类能力：
+
+- 浏览器 render engine：加载 Zip `.lume`、PDF 和兼容脚本课程。
+- Node runtime-control：提供更通用的 host/viewer 身份、事件转发和 `/api/runtime-status`。
+
+core server 是运行时边界验证工具，不替代教师端完整数据面。它的 `/api/courses` 当前返回空的兼容结构。
+
+## 编辑链路
+
+AI Editor 和 VS Code 插件都围绕 Zip `.lume` 格式工作：
+
+```text
+AI Editor / VS Code Custom Editor
+  -> manifest.json + pages + assets
+  -> Zip .lume
+  -> Teacher Server course directory
+  -> Render Engine playback
+```
+
+VS Code 插件会启动本地预览服务，并把 `.lume` 文件镜像到扩展内的 preview 目录。它还会把 AI Editor 构建产物嵌入 webview 作为自定义编辑器。
+
+## 当前可确认和待补充
+
+可确认：服务路由、Socket 事件、`.lume` Zip manifest、render engine API、AI Editor 本地 Zip 读写、VS Code 插件命令。
+
+待补充：正式发布拓扑、安装包产物规范、生产部署推荐、课堂网络策略和 UI 截图。
+
+## 下一步阅读
+
+- [仓库边界](/concepts/repo-boundaries)
+- [课堂同步](/concepts/classroom-sync)
+- [运行模式](/guides/run-modes)

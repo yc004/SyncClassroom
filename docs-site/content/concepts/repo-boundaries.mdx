@@ -1,0 +1,50 @@
+---
+title: 仓库边界
+description: 当前 workspace 中每个目录的职责和修改入口。
+---
+
+# 仓库边界
+
+本页帮助你判断一个需求应该改哪个包。LumeSync（萤火课堂）当前采用根仓库 + 多个 submodule/workspace 包组织，路径写错会直接导致脚本和文档失效。
+
+## 目录职责
+
+| 路径 | 适合修改的内容 |
+| --- | --- |
+| `repos/teacher/server` | 教师端 HTTP API、Socket.IO、课程扫描、提交、导出、座位表 |
+| `repos/teacher/shared/teacher-shell` | 教师端 React UI、课堂布局、课程选择、监控面板 |
+| `repos/teacher/core/src/browser/engine` | render engine、`.lume` 加载、内置课件组件 |
+| `repos/teacher/core/src/node` | runtime-control、身份校验、服务端事件转发 |
+| `repos/student` | 学生端 shell、离线页、配置 UI、自动启动 |
+| `repos/ai-editor` | AI Editor、Zip `.lume` 读写、浏览器预览/export |
+| `repos/editor-plugin` | VS Code 插件命令、自定义编辑器、本地预览服务 |
+| `docs-site` | 本 Nextra 文档站 |
+
+## 不要使用旧路径
+
+旧文档中出现过 `repos/core`。当前源码中 core 的真实路径是：
+
+```text
+repos/teacher/core
+```
+
+根脚本 `start:core` 也指向这个路径。
+
+## 修改建议
+
+- 只改课堂 API 或 Socket 协议：从 `repos/teacher/server` 开始。
+- 只改课程播放能力：从 `repos/teacher/core/src/browser/engine` 开始。
+- 只改 `.lume` 编辑体验：从 `repos/ai-editor` 或 `repos/editor-plugin` 开始。
+- 只改学生机配置和连接逻辑：从 `repos/student` 开始。
+
+## 常见错误
+
+- 在教师端服务里重复实现 core 已有的 render engine 逻辑。
+- 在 core server 里添加教师端业务数据面接口。
+- 修改 `shared/public` 构建产物，而不是修改 `shared/teacher-shell/src` 源码。
+
+## 下一步阅读
+
+- [系统架构](/concepts/architecture)
+- [课件运行时](/concepts/course-runtime)
+- [贡献指南](/community/contributing)

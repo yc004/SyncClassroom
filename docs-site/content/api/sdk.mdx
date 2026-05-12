@@ -1,0 +1,130 @@
+---
+title: 课件 SDK
+description: 当前课件页面可以使用的运行时 API、上下文和内置组件。
+---
+
+# 课件 SDK
+
+课件 SDK 面向 `.lume` 页面模块，提供课堂上下文、状态同步、学生提交和内置互动组件。类型来源主要是 `types/lumesync-course-sdk.d.ts` 与 core render engine 当前实现。
+
+## CourseGlobalContext
+
+```tsx
+import { CourseGlobalContext } from '@lumesync/course-sdk'
+import React from 'react'
+
+export default function Slide() {
+  const ctx = React.useContext(CourseGlobalContext)
+  const [answer, setAnswer] = ctx.useSyncVar('answer', '')
+
+  return <input value={answer} onChange={(event) => setAnswer(event.target.value)} />
+}
+```
+
+当前可确认方法：
+
+| API | 用途 |
+| --- | --- |
+| `isHost` | 判断当前是否教师端 |
+| `getSocket()` | 获取底层 Socket.IO client |
+| `getCurrentCourseMeta()` | 获取当前课程元信息 |
+| `getStudentInfo()` | 获取学生信息 |
+| `useSyncVar(key, initialValue)` | 同步变量 |
+| `useLocalVar(key, initialValue)` | 本地变量 |
+| `submitContent(payload)` | 学生提交内容 |
+| `setVoteToolbarState(state)` | 设置投票工具栏状态 |
+| `clearVoteToolbarState()` | 清空投票工具栏状态 |
+
+源码实现中还存在 camera 和 `syncInteraction` 相关能力，但公开类型文件未完整声明。使用前应补类型和文档。
+
+## submitContent
+
+学生端可提交内容到教师端。host 调用会抛错，未连接 socket 时也会失败。
+
+```tsx
+await ctx.submitContent({
+  fileName: 'answer.json',
+  content: JSON.stringify({ answer: 'B' }, null, 2)
+})
+```
+
+当前实现会等待 `student:submit:result`，默认 10 秒超时。
+
+## VoteSlide
+
+投票组件用于课堂即时选择题。配置至少需要问题和两个选项。
+
+```tsx
+import { VoteSlide } from '@lumesync/course-sdk'
+
+export default function Poll() {
+  return (
+    <VoteSlide
+      config={{
+        id: 'poll-1',
+        question: 'React 组件必须返回什么？',
+        options: [
+          { id: 'a', label: 'DOM 节点' },
+          { id: 'b', label: 'React 元素' }
+        ],
+        anonymous: false
+      }}
+    />
+  )
+}
+```
+
+## SurveySlide
+
+问卷组件会把学生答案整理为 CSV 样式数据并通过 `submitContent` 提交。它支持必填校验、进度显示、本地草稿和主题配置。
+
+```tsx
+import { SurveySlide } from '@lumesync/course-sdk'
+
+export default function Survey() {
+  return (
+    <SurveySlide
+      config={{
+        id: 'feedback',
+        title: '课堂反馈',
+        questions: [
+          { id: 'q1', type: 'text', title: '今天最难的部分是什么？', required: true }
+        ]
+      }}
+    />
+  )
+}
+```
+
+## WebPageSlide
+
+用于把网页嵌入课件页。
+
+```tsx
+import { WebPageSlide } from '@lumesync/course-sdk'
+
+export default function Docs() {
+  return <WebPageSlide url="https://react.dev" title="React 文档" />
+}
+```
+
+可配置 `allow`、`referrerPolicy` 和 `openLabel`。
+
+## LumeSyncRenderEngine
+
+浏览器运行时导出 `LumeSyncRenderEngine`，主要给教师端、AI Editor 和导出流程使用：
+
+- `loadCourse`
+- `renderCourseStage`
+- `renderCourseExportDocument`
+- `buildCourseDataFromMemory`
+- `createCourseContext`
+- `createExportCourseContext`
+
+普通课件页面通常不需要直接调用这些 API。
+
+## 下一步阅读
+
+- [课件运行时](/concepts/course-runtime)
+- [学生提交示例](/examples/submission)
+- [同步变量示例](/examples/sync-var)

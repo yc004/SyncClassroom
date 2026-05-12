@@ -1,0 +1,152 @@
+---
+title: HTTP API
+description: 教师端服务和 core runtime 当前可确认的 HTTP 接口。
+---
+
+# HTTP API
+
+教师端服务是完整课堂数据面，API 同时挂载在 `/api` 和 `/api/teacher`。core runtime server 只提供运行时兼容接口，不托管完整课程数据。
+
+## 教师端服务
+
+源码位置：`repos/teacher/server/src/routes.js` 和 `repos/teacher/server/index.js`。
+
+### 健康检查
+
+```http
+GET /api/health
+```
+
+返回服务状态、应用名、端口和进程 ID。
+
+### Session bootstrap
+
+```http
+POST /api/session/bootstrap
+```
+
+为 host/teacher 或 viewer 创建启动会话。教师端服务会使用 `LUMESYNC_HOST_TOKEN`、`LUMESYNC_VIEWER_TOKEN_SECRET` 和 TTL 环境变量生成 token。
+
+示例 body：
+
+```json
+{
+  "role": "viewer"
+}
+```
+
+### 课程接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/courses` | 返回课程、文件夹和当前课堂状态 |
+| `GET` | `/api/components-manifest` | 返回组件 manifest |
+| `GET` | `/api/course-status` | 返回当前课程和页码 |
+| `POST` | `/api/refresh-courses` | 重新扫描课程目录 |
+| `DELETE` | `/api/delete-course` | 删除课程，`courseId` 来自 body 或 query |
+| `GET` | `/api/export-course/:courseId?format=pdf|lume` | 导出课程 |
+
+### 文件夹接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/course-folders` | 创建文件夹 |
+| `DELETE` | `/api/course-folders/:folderId` | 删除文件夹 |
+| `PUT` | `/api/course-folders/:folderId/move` | 移动文件夹 |
+| `PUT` | `/api/course-folders/:folderId` | 重命名或更新文件夹 |
+| `PUT` | `/api/course-folders/:folderId/courses/:courseId` | 移动课程到文件夹 |
+
+创建文件夹示例：
+
+```json
+{
+  "name": "人工智能",
+  "icon": "book",
+  "parentId": null
+}
+```
+
+### 课堂布局
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/classroom-layout` | 读取座位表 |
+| `POST` | `/api/save-classroom-layout` | 保存座位表 |
+
+### 学生提交
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/save-submission` | 保存提交内容 |
+| `GET` | `/api/submission-config` | 读取提交目录配置 |
+| `POST` | `/api/submission-config` | 更新提交目录配置 |
+| `GET` | `/api/submissions/:courseId` | 列出课程提交文件 |
+| `GET` | `/api/submissions/:courseId/file/:fileName(*)` | 下载单个提交文件 |
+| `POST` | `/api/submissions/:courseId/download-batch` | 批量打包下载 |
+
+批量下载示例：
+
+```json
+{
+  "files": ["student-a/answer.json", "student-b/answer.json"]
+}
+```
+
+### 学生状态和日志
+
+`index.js` 中还挂载了顶层接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/students` | 当前学生状态 |
+| `GET` | `/api/student-log` | 学生行为日志 |
+
+### 静态与代理资源
+
+| 路径 | 说明 |
+| --- | --- |
+| `/courses` | 课程文件 |
+| `/components` | 组件资源 |
+| `/engine` | render engine 静态资源 |
+| `/teacher-app.js` | 教师端 UI bundle |
+| `/render-engine.js` | render engine bundle |
+| `/lib/:fileName` | 缓存依赖资源 |
+| `/webfonts/:fileName` | 字体资源 |
+| `/lib/fonts/:fileName` | 兼容字体路径 |
+| `/images/proxy` | 图片代理 |
+| `/weights/:fileName` | 权重文件 |
+
+## core runtime API
+
+源码位置：`repos/teacher/core/src/server/create-core-server.ts`。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/health` | 返回 `LumeSync-Core` 状态 |
+| `GET` | `/api/courses` | 返回空课程兼容结构，`mode: "core-runtime"` |
+| `GET` | `/api/course-status` | 返回 runtime 模式状态 |
+| `POST` | `/api/refresh-courses` | 空刷新兼容接口 |
+| `GET` | `/api/components-manifest` | 空组件 manifest 兼容接口 |
+| `GET` | `/api/runtime-status` | 返回 host/viewer runtime 快照 |
+| `GET` | `/api/students` | 兼容接口 |
+| `GET` | `/api/student-log` | 兼容接口 |
+| `POST` | `/api/session/bootstrap` | 仅支持 viewer token bootstrap |
+
+core server 的 `/api/session/bootstrap` 需要配置 `LUMESYNC_VIEWER_TOKEN_SECRET`。
+
+## 错误处理
+
+常见错误响应结构：
+
+```json
+{
+  "success": false,
+  "error": "Missing courseId parameter"
+}
+```
+
+## 下一步阅读
+
+- [Socket 事件](/api/socket)
+- [配置项](/api/config)
+- [教师端工作流](/guides/teacher-workflow)

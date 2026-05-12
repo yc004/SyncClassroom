@@ -1,0 +1,86 @@
+---
+title: 安装
+description: 安装 LumeSync（萤火课堂）开发环境并理解当前 workspace 组成。
+---
+
+# 安装
+
+本页说明项目依赖、workspace 包和本地构建前置条件。优先按源码中可确认的命令安装，无法确认的发布包流程暂不编造。
+
+## Workspace 组成
+
+根 `pnpm-workspace.yaml` 当前包含：
+
+| 路径 | 包名 | 作用 |
+| --- | --- | --- |
+| `.` | `lumesync-workspace` | 根脚本、submodule 管理和文档站入口 |
+| `docs-site` | `@lumesync/docs-site` | Nextra 文档站 |
+| `website` | 待确认 | 旧/独立网站目录 |
+| `repos/teacher` | `@lumesync/teacher` | 教师端服务、教师端 shell、课程数据面 |
+| `repos/teacher/core` | `@lumesync/core` | 运行时控制、render engine、课程 SDK 公共出口 |
+| `repos/student` | `@lumesync/student` | 学生端 shell 和 host UI |
+| `repos/editor-plugin` | `lumesynceditor` | VS Code `.lume` 插件 |
+| `repos/ai-editor` | `@lumesync/ai-editor` | Vite React `.lume` 编辑器 |
+
+## 安装依赖
+
+```bash
+pnpm run repos:init
+pnpm install
+```
+
+只安装文档站依赖时：
+
+```bash
+corepack pnpm --dir docs-site install
+```
+
+## Web 开发前置条件
+
+- Node.js：建议使用当前 LTS 或与团队一致的版本
+- pnpm：根仓库声明为 `pnpm@10.33.0`
+- Git：需要支持 submodule
+
+## Windows 桌面前置条件
+
+教师端和学生端的原生壳需要 Windows 构建环境：
+
+- Visual Studio 2022 C++ 工具链
+- CMake
+- WebView2 Runtime
+- PowerShell
+
+如果没有桌面构建环境，仍然可以运行 `start:teacher-server`、`start:core`、`start:ai-editor` 和 `docs:dev`。
+
+## 启动文档站
+
+```bash
+pnpm run docs:dev
+```
+
+默认地址：
+
+```text
+http://localhost:3001
+```
+
+## 验证安装
+
+```bash
+pnpm run start:teacher-server
+curl http://localhost:3000/api/health
+```
+
+期望返回包含 `ok: true`、应用名、端口和进程 ID 的 JSON。
+
+## 注意事项
+
+- 不要把旧路径 `repos/core` 用在脚本或文档中；当前 core 在 `repos/teacher/core`。
+- 桌面启动脚本不是构建脚本。缺少 `.exe` 时需要先执行对应 native build/package 脚本。
+- AI Editor 当前是前端应用；根脚本中的 AI service 路径在当前仓库中未找到。
+
+## 下一步阅读
+
+- [快速开始](/getting-started/quick-start)
+- [仓库边界](/concepts/repo-boundaries)
+- [配置项](/api/config)

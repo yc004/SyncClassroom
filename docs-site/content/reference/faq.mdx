@@ -1,0 +1,48 @@
+---
+title: FAQ
+description: LumeSync（萤火课堂）当前代码和文档中的常见问题。
+---
+
+# FAQ
+
+本页回答当前仓库最容易混淆的问题。答案以最新源码为准。
+
+## 项目到底叫什么？
+
+产品英文名是 LumeSync，中文名是 萤火课堂。当前 GitHub 仓库目录仍可能叫 `SyncClassroom`，这只是历史仓库名或本地目录名。
+
+## core 在哪里？
+
+当前路径是：
+
+```text
+repos/teacher/core
+```
+
+不是 `repos/core`。
+
+## 新课件应该用 window.CourseData 吗？
+
+不应该。新课件应使用 Zip `.lume` 包，包含 `manifest.json`、`pages` 和 `assets`。`window.CourseData` 只是非 Zip 脚本课程的兼容路径。
+
+## 旧单文件 .lume 还能播放吗？
+
+当前 render engine 会拒绝旧单文件 `.lume`，并提示迁移到 Zip manifest 格式。
+
+## 教师端服务和 core server 有什么区别？
+
+教师端服务是完整课堂数据面：课程、座位表、提交、投票、监控和导出都在这里。core server 主要用于运行时控制和 render engine 资源，不托管完整课程业务。
+
+## 为什么同步变量没有生效？
+
+教师端默认 `syncInteraction: false`。开启同步交互后，host 端的 `sync-var` 才会转发给学生端。
+
+## AI Editor 是否依赖后端 AI service？
+
+当前仓库中 AI Editor 是 Vite React 应用，可以本地读写 `.lume`。根脚本里的 `start:ai-service` 指向的服务目录在当前代码中未找到，需后续补充或修正。
+
+## 下一步阅读
+
+- [排障](/guides/troubleshooting)
+- [仓库边界](/concepts/repo-boundaries)
+- [配置项](/api/config)

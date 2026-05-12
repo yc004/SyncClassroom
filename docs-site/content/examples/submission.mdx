@@ -1,0 +1,58 @@
+---
+title: 学生提交
+description: 使用 submitContent 把学生答案发送到教师端。
+---
+
+# 学生提交
+
+学生提交适合收集文本答案、JSON、CSV 或组件生成的结果。当前实现会通过 Socket 转发给 host，并等待 `student:submit:result`。
+
+## 页面示例
+
+```tsx
+import React from 'react'
+import { CourseGlobalContext } from '@lumesync/course-sdk'
+
+export default function SubmissionDemo() {
+  const ctx = React.useContext(CourseGlobalContext)
+  const [answer, setAnswer] = React.useState('')
+  const [status, setStatus] = React.useState('未提交')
+
+  async function submit() {
+    try {
+      setStatus('提交中')
+      await ctx.submitContent({
+        fileName: 'answer.json',
+        content: JSON.stringify({ answer }, null, 2)
+      })
+      setStatus('已提交')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '提交失败')
+    }
+  }
+
+  return (
+    <main style={{ padding: 48 }}>
+      <h1>课堂练习</h1>
+      <textarea value={answer} onChange={(event) => setAnswer(event.target.value)} />
+      <button disabled={ctx.isHost || !answer.trim()} onClick={submit}>
+        提交
+      </button>
+      <p>{ctx.isHost ? '教师端不能提交学生答案。' : status}</p>
+    </main>
+  )
+}
+```
+
+## 注意事项
+
+- `submitContent` 在 host 端会抛错。
+- 未连接 socket 时会失败。
+- 当前实现等待结果超时时间为 10 秒。
+- 需要合并文件时可以传 `mergeFile: true`，具体落盘格式以教师端提交实现为准。
+
+## 下一步阅读
+
+- [HTTP API](/api/http)
+- [教师端工作流](/guides/teacher-workflow)
+- [SurveySlide API](/api/sdk)

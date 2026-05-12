@@ -1,0 +1,68 @@
+---
+title: 课堂同步
+description: 理解教师端 Socket 同步和 core runtime-control 的区别。
+---
+
+# 课堂同步
+
+LumeSync（萤火课堂）有两套相关但不同的同步层：教师端服务负责真实课堂业务，core runtime-control 提供更通用的 host/viewer 事件转发能力。写文档或调试时需要区分它们。
+
+## 教师端课堂同步
+
+教师端服务位于 `repos/teacher/server`，Socket 逻辑在 `server/src/socket.js`。它维护：
+
+- host/viewer 角色
+- 当前课程和当前页码
+- 教师端设置
+- 在线学生状态
+- 投票状态
+- 标注状态
+- 学生截图和提交
+
+连接建立后，服务端会发送 `role-assigned`，其中包含当前课程、页码、设置和课程目录。
+
+## 身份与 token
+
+教师端服务会读取：
+
+- `LUMESYNC_HOST_TOKEN`
+- `LUMESYNC_VIEWER_TOKEN_SECRET`
+- `LUMESYNC_VIEWER_TOKEN_TTL_SEC`
+- `LUMESYNC_HOST_TOKEN_TTL_SEC`
+
+如果没有配置，当前服务会在启动时生成默认 token/secret，并保留本地/兼容身份逻辑。生产部署时应显式配置 token 和 secret。
+
+`POST /api/session/bootstrap` 可以为 host/teacher 或 viewer 创建启动会话。
+
+## 同步变量
+
+`useSyncVar` 底层使用 `sync-var` 事件。教师端实现中只有满足以下条件才会向学生端转发：
+
+- socket 角色是 `host`
+- `hostSettings.syncInteraction` 为 `true`
+
+因此调试同步变量时，先确认教师端“同步交互”设置已开启。
+
+## core runtime-control
+
+core 的 `setupSocketHandlers` 位于 `repos/teacher/core/src/node/runtime-control.ts`。它更通用：
+
+- 可关闭 legacy 身份兼容：`LUMESYNC_IDENTITY_LEGACY_COMPAT=false`
+- host 事件默认广播给其它连接
+- viewer 事件默认转发给 hosts
+- 支持 `targetId` 定向转发
+- 保留 `role-assigned`、`identity-rejected`、`participant-joined`、`participant-left` 等服务端事件
+
+core server 不维护课程目录、座位表或提交数据。
+
+## 常见错误
+
+- 把 core runtime-control 的泛化事件转发当成教师端完整课堂协议。
+- 以为 `sync-var` 默认开启；当前教师端默认 `syncInteraction: false`。
+- 没有配置 viewer secret 却使用 core 的 viewer bootstrap。
+
+## 下一步阅读
+
+- [Socket 事件](/api/socket)
+- [HTTP API](/api/http)
+- [同步变量示例](/examples/sync-var)
