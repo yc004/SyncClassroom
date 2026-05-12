@@ -4,9 +4,9 @@
   "private": true,
   "description": "LumeSync documentation site",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "dev": "pnpm exec next dev",
+    "build": "pnpm exec next build",
+    "start": "pnpm exec next start"
   },
   "dependencies": {
     "next": "^16.0.0",
